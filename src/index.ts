@@ -255,7 +255,15 @@ interface GeolocationData {
 	questionId: string;
 }
 
-// Helper function to extract user agent from user_agent field
+// Interface for hash data
+interface HashData {
+	retainer_text: string | null;
+	signature_data_image: string | null;
+	created_at: string | null;
+	hash: string;
+}
+
+// Helper function to extract user agent from Get User Agent widget
 function getUserAgentFromSubmission(submissionData: JotFormSubmissionResponse | null): UserAgentData | null {
 	if (!submissionData) {
 		console.log('No submission data provided');
@@ -264,40 +272,89 @@ function getUserAgentFromSubmission(submissionData: JotFormSubmissionResponse | 
 
 	if (submissionData.content && submissionData.content.answers) {
 		for (const [questionId, answer] of Object.entries(submissionData.content.answers)) {
-			// Look for user_agent field by matching the text property
-			if (answer.text === 'user_agent') { // Match by text
-				console.log(`Found user_agent field in question ${questionId}`);
+			// Look for Get User Agent widget by matching the cfname property
+			if ((answer as any).cfname === 'Get User Agent') {
+				console.log(`Found Get User Agent widget in question ${questionId}`);
 				
-				// Parse the multi-line answer to extract USER AGENT line
-				const answerData = answer.answer;
+				// Extract the user agent directly from the answer field
+				const userAgent = answer.answer;
 				
-				if (typeof answerData === 'string') {
-					// Split by newlines and find the USER AGENT line
-					const lines = answerData.split('\n');
-					const userAgentLine = lines.find(line => line.startsWith('USER AGENT: '));
-					
-					if (userAgentLine) {
-						// Extract the value after "USER AGENT: "
-						const userAgent = userAgentLine.substring('USER AGENT: '.length).trim();
-						
-						const userAgentData: UserAgentData = {
-							questionId,
-							user_agent: userAgent
-						};
-						console.log(`Found user agent in question ${questionId}: ${userAgent}`);
-						return userAgentData;
-					} else {
-						console.log(`user_agent field found but no USER AGENT line in question ${questionId}`);
-					}
+				if (typeof userAgent === 'string' && userAgent.trim()) {
+					const userAgentData: UserAgentData = {
+						questionId,
+						user_agent: userAgent.trim()
+					};
+					console.log(`Found user agent in question ${questionId}: ${userAgent}`);
+					return userAgentData;
 				} else {
-					console.log(`user_agent field found but answer is not a string in question ${questionId}`);
+					console.log(`Get User Agent widget found but no valid user agent string in question ${questionId}`);
 				}
 			}
 		}
 	}
 	
-	console.log('No user_agent field found');
+	console.log('No Get User Agent widget found');
 	return null;
+}
+
+// Helper function to create a hash from retainer text, signature base64, and created_at
+async function createHash(submissionData: JotFormSubmissionResponse | null, signatureBase64: string | null): Promise<HashData> {
+	const hashData: HashData = {
+		retainer_text: null,
+		signature_data_image: signatureBase64,
+		created_at: null,
+		hash: ''
+	};
+	
+	if (!submissionData) {
+		console.log('No submission data provided for hash creation');
+		return hashData;
+	}
+
+	// Extract created_at
+	hashData.created_at = submissionData.content?.created_at || null;
+
+	if (submissionData.content && submissionData.content.answers) {
+		for (const [questionId, answer] of Object.entries(submissionData.content.answers)) {
+			// Look for retainer field by name "retainer0"
+			if (answer.name === 'retainer0' && answer.type === 'control_text') {
+				hashData.retainer_text = answer.text || null;
+				console.log(`Found retainer text in question ${questionId} (length: ${hashData.retainer_text?.length || 0})`);
+			}
+		}
+	}
+
+	// Create hash from the extracted data
+	const hashInput = [
+		hashData.retainer_text || '',
+		hashData.signature_data_image || '',
+		hashData.created_at || ''
+	].join('|');
+
+	try {
+		// Create SHA-256 hash using Cloudflare Workers crypto API
+		const encoder = new TextEncoder();
+		const data = encoder.encode(hashInput);
+		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+		const hashArray = Array.from(new Uint8Array(hashBuffer));
+		hashData.hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+		console.log(`Created SHA-256 hash: ${hashData.hash}`);
+	} catch (error) {
+		console.error('Error creating crypto hash:', error);
+		// Fallback to a simple base64-based hash if crypto fails
+		hashData.hash = btoa(hashInput).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+		console.log(`Created fallback hash: ${hashData.hash}`);
+	}
+
+	console.log('Hash data extracted:', {
+		retainer_text_length: hashData.retainer_text?.length || 0,
+		signature_data_image_length: hashData.signature_data_image?.length || 0,
+		created_at: hashData.created_at,
+		hash_input_length: hashInput.length,
+		hash: hashData.hash
+	});
+
+	return hashData;
 }
 
 // Helper function to extract geolocation from Detected Location field
@@ -492,7 +549,11 @@ function mapToLeadDocketFormat(inputParams: any): any {
 		
 		// Add any other fields you want to track
 		__guid: `jotform_${inputParams.submission_id}`,
-		hash: inputParams.submission_id // Using submission ID as a unique identifier
+		hash: inputParams.hash_data?.hash || inputParams.submission_id, // Use generated hash or fallback to submission ID
+		
+		// Additional hash-related fields
+		retainer_text_hash: inputParams.hash_data?.retainer_text ? 'present' : 'missing',
+		signature_data_image_hash: inputParams.hash_data?.signature_data_image ? 'present' : 'missing'
 	};
 	
 	// Add eligibility questions as separate fields
@@ -591,6 +652,7 @@ async function processWebhookInBackground(submissionId: string, formId: string, 
 		const geolocationData = getGeolocationFromSubmission(submissionData);
 		const hiddenFields = getHiddenFieldsFromSubmission(submissionData);
 		const eligibilityQuestions = getEligibilityQuestionsFromSubmission(submissionData);
+		const hashData = await createHash(submissionData, signatureBase64);
 
 		// Build the consolidated input parameters
 		const inputParams = {
@@ -641,6 +703,9 @@ async function processWebhookInBackground(submissionId: string, formId: string, 
 			// Eligibility questions from form
 			eligibility_questions: eligibilityQuestions,
 			
+			// Hash data from retainer text, signature, and created_at
+			hash_data: hashData,
+			
 			// Include arrays of all found instances (in case there are multiple)
 			all_data: {
 				names: names,
@@ -649,7 +714,8 @@ async function processWebhookInBackground(submissionId: string, formId: string, 
 				addresses: addresses,
 				hidden_fields: hiddenFields,
 				eligibility_questions: eligibilityQuestions,
-				geolocation: geolocationData
+				geolocation: geolocationData,
+				hash_data: hashData
 			}
 		};
 
