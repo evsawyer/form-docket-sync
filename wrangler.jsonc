@@ -6,6 +6,8 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "form-docket-sync",
 	"main": "src/index.ts",
+
+	"account_id": "1c894341e2d7e60bfa5c0005047f4389",
 	"compatibility_date": "2025-07-19",
 	"observability": {
 		"enabled": true

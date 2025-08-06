@@ -1,0 +1,119 @@
+Title: @thumbmarkjs/thumbmarkjs
+
+URL Source: http://www.npmjs.com/package/@thumbmarkjs/thumbmarkjs
+
+Markdown Content:
+[![Image 1: GitHub package.json dynamic](https://camo.githubusercontent.com/8430b68bd4170f32d487e3736189a05b65be795897ff2edbb65aaa31e62fdc77/68747470733a2f2f696d672e736869656c64732e696f2f6769746875622f7061636b6167652d6a736f6e2f76657273696f6e2f696c6b6b6170656c746f6c612f7468756d626d61726b6a73)](https://camo.githubusercontent.com/8430b68bd4170f32d487e3736189a05b65be795897ff2edbb65aaa31e62fdc77/68747470733a2f2f696d672e736869656c64732e696f2f6769746875622f7061636b6167652d6a736f6e2f76657273696f6e2f696c6b6b6170656c746f6c612f7468756d626d61726b6a73)[![Image 2: NPM Version](https://camo.githubusercontent.com/644f38fe8d4b53388aa5b9ebd7c73e03096f62cadd6890d49b2162f66e1408c5/68747470733a2f2f696d672e736869656c64732e696f2f6e706d2f762f407468756d626d61726b6a732f7468756d626d61726b6a73)](https://camo.githubusercontent.com/644f38fe8d4b53388aa5b9ebd7c73e03096f62cadd6890d49b2162f66e1408c5/68747470733a2f2f696d672e736869656c64732e696f2f6e706d2f762f407468756d626d61726b6a732f7468756d626d61726b6a73)[![Image 3: NPM Downloads](https://camo.githubusercontent.com/f6cbb1f2029ad5978dd3eb1c0895002d5e46a3b855911af95d29b0ca7583b079/68747470733a2f2f696d672e736869656c64732e696f2f6e706d2f646d2f2534307468756d626d61726b6a732532467468756d626d61726b6a73)](https://camo.githubusercontent.com/f6cbb1f2029ad5978dd3eb1c0895002d5e46a3b855911af95d29b0ca7583b079/68747470733a2f2f696d672e736869656c64732e696f2f6e706d2f646d2f2534307468756d626d61726b6a732532467468756d626d61726b6a73)[![Image 4: jsDelivr hits](https://camo.githubusercontent.com/56526016729a5e77c27ce6c18a7c86d9919b7a0bea609c75939171973645d331/68747470733a2f2f696d672e736869656c64732e696f2f6a7364656c6976722f6e706d2f686d2f2534307468756d626d61726b6a732532467468756d626d61726b6a73)](https://camo.githubusercontent.com/56526016729a5e77c27ce6c18a7c86d9919b7a0bea609c75939171973645d331/68747470733a2f2f696d672e736869656c64732e696f2f6a7364656c6976722f6e706d2f686d2f2534307468756d626d61726b6a732532467468756d626d61726b6a73)
+
+ThumbmarkJS is now the world's best **free** browser fingerprinting JavaScript library. It is used to generate over a billion thumbmarks every month.
+
+The client ThumbmarkJS library is open source (MIT). There also an API version. Learn more at [ThumbmarkJS website](https://www.thumbmarkjs.com/).
+
+ThumbmarkJS is meant to be used for good. Use this to prevent scammers and spammers for example. If you see this library being used for evil, contact me.
+
+🕺 Join the [Thumbmark Discord channel](https://discord.gg/PAqxQ3TnDA)
+
+Have a look at the [IOS](https://github.com/thumbmarkjs/thumbmark-swift) and [Android](https://github.com/thumbmarkjs/thumbmark-android) versions as well.
+
+Even the client library alone works adequately to distinguish common browsers. Sampled data show a uniqueness of around and above 90%.
+
+Mileage may vary though. Mac/Safari users tend to either clash more than Windows users, or be too unique (noise in the components). It does depend on your audience, too.
+
+With the added entropy from an API call, that includes server-side components by investigating headers, TLS handshake signatures etc, it gets veeery unique. Like 99%.
+
+Transpiled bundles are available now on [JSDelivr](https://www.jsdelivr.com/).
+
+Supported module formats:
+
+*   UMD: [https://cdn.jsdelivr.net/npm/@thumbmarkjs/thumbmarkjs/dist/thumbmark.umd.js](https://cdn.jsdelivr.net/npm/@thumbmarkjs/thumbmarkjs/dist/thumbmark.umd.js)
+*   CommonJS: [https://cdn.jsdelivr.net/npm/@thumbmarkjs/thumbmarkjs/dist/thumbmark.cjs.js](https://cdn.jsdelivr.net/npm/@thumbmarkjs/thumbmarkjs/dist/thumbmark.cjs.js)
+*   ESM: [https://cdn.jsdelivr.net/npm/@thumbmarkjs/thumbmarkjs/dist/thumbmark.esm.js](https://cdn.jsdelivr.net/npm/@thumbmarkjs/thumbmarkjs/dist/thumbmark.esm.js)
+
+import('https://cdn.jsdelivr.net/npm/@thumbmarkjs/thumbmarkjs/dist/thumbmark.umd.js')
+.then(() => {
+  const tm = new ThumbmarkJS.Thumbmark();
+  tm.get().then((res) => {
+      console.log(res)
+  })
+})
+
+Options are passed to the Thumbmark constructor so:
+
+const tm = new ThumbmarkJS.Thumbmark({
+  option_key: option_value
+})
+
+| option | type | example | what it does |
+| --- | --- | --- | --- |
+| api_key | string | 'ae8679607bf79f......' | Setting this to a key you've obtained from [https://thumbmarkjs.com](https://www.npmjs.com/package/@thumbmarkjs/thumbmarkjs.com) makes thumbmarks incredibly more unique |
+| exclude | string[] | ['webgl', 'system.browser.version'] | Removes components from the fingerprint hash. An excluded top-level component improves performance. |
+| include | string[] | ['webgl', 'system.browser.version'] | Only includes the listed components. exclude still excludes included components. |
+| permissions_to_check | string[] | ['gyroscope', 'accelerometer'] | Checks only selected permissions. Like 'include', but more low-level. Permissions take the longest to resolve, so this is if you need to cut down some milliseconds. |
+| timeout | integer | 5000 | Default is 5000. Component timeout in milliseconds. |
+| logging | boolean | true | Default is true. Some releases collect at most 0.01% logs to improve the library. This doesn't affect the user. |
+| performance | boolean | false | Default is false. Setting to true includes millisecond performance of component resolving |
+
+example usage:
+
+const tm_api = new ThumbmarkJS.Thumbmark({
+    api_key: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    exclude: ['math']
+});
+
+You can add custom components to the hash with `includeComponent`, which takes two parameters, the `key` being the key of the component in the JSON and the function that returns the value (a string, a number or a JSON object). So for example, if you wanted to include an IP address in the components, you could do it like so:
+
+function fetchIpAddress() {
+  return new Promise((resolve, reject) => {
+    fetch('http://checkip.amazonaws.com')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.text();
+      })
+      .then(ip => resolve({'ip_address': ip.trim()}))
+      .catch(error => {
+        console.error('There was a problem with the fetch operation:', error);
+        reject(error);
+      });
+  });
+}
+
+const tm = new ThumbmarkJS.Thumbmark();
+tm.includeComponent('ip_address', fetchIpAddress)
+
+The function is expected to return a `Promise`, but it seems it works without, too.
+
+Installing from NPM:
+
+npm install @thumbmarkjs/thumbmarkjs
+
+and in your code
+
+import { Thumbmark } from '@thumbmarkjs/thumbmarkjs'
+
+To implement ThumbmarkJS in a Next.js app, you can use a component [like this](https://www.npmjs.com/package/@thumbmarkjs/examples/nextjs.tsx).
+
+⚠️ the library is meant to be running in the browser. Let me know if the library fails on a server side import, that shouldn't happen. Just you can't try to calculate the fingerprint server-side.
+
+Clone this repo and then run
+
+```
+npm run install
+npm run build
+```
+
+*   audio fingerprint
+*   canvas fingerprint
+*   webgl fingerprint
+*   available fonts and how they render
+*   videocard
+*   browser languages and time zone
+*   browser permissions
+*   available plugins
+*   a ton of screen details including media queries
+*   and a bunch of smaller things
+
+I wanted to create something that's easy to build, extend and use. If you're interested in how the library works, the structure is very simple.
+
+Have a look at the [technical_details](https://www.npmjs.com/package/@thumbmarkjs/technical_details.md)
