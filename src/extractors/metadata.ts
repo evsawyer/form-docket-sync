@@ -35,7 +35,7 @@ export function getUserAgentFromSubmission(submissionData: JotFormSubmissionResp
 	return null;
 }
 
-// Helper function to extract geolocation from Detected Location field
+// Helper function to extract geolocation from Geo Stamp widget
 export function getGeolocationFromSubmission(submissionData: JotFormSubmissionResponse | null): GeolocationData | null {
 	if (!submissionData) {
 		console.log('No submission data provided for geolocation');
@@ -44,27 +44,46 @@ export function getGeolocationFromSubmission(submissionData: JotFormSubmissionRe
 
 	if (submissionData.content && submissionData.content.answers) {
 		for (const [questionId, answer] of Object.entries(submissionData.content.answers)) {
-			// Look for Detected Location field by matching the text property
-			if (answer.text === 'Detected Location') {
-				console.log(`Found Detected Location field in question ${questionId}`);
+			// Look for Geo Stamp widget by matching the cfname property
+			if ((answer as any).cfname === 'Geo Stamp') {
+				console.log(`Found Geo Stamp widget in question ${questionId}`);
 				
-				const locationData = answer.answer;
+				const geoStampData = answer.answer;
 				
-				if (typeof locationData === 'string' && locationData.trim()) {
-					// The answer should be in format "lat, lon"
-					const geolocationData: GeolocationData = {
-						questionId,
-						geolocation: locationData.trim()
-					};
-					console.log(`Found geolocation in question ${questionId}: ${locationData}`);
-					return geolocationData;
+				if (typeof geoStampData === 'string' && geoStampData.trim()) {
+					// Parse the multi-line geo stamp data to extract latitude and longitude
+					const lines = geoStampData.split('\n');
+					let latitude: string | null = null;
+					let longitude: string | null = null;
+					
+					for (const line of lines) {
+						if (line.startsWith('Latitude: ')) {
+							latitude = line.substring('Latitude: '.length).trim();
+						} else if (line.startsWith('Longitude: ')) {
+							longitude = line.substring('Longitude: '.length).trim();
+						}
+					}
+					
+					if (latitude && longitude) {
+						// Format as "lat,lon" for consistency
+						const geolocationCoords = `${latitude},${longitude}`;
+						
+						const geolocationData: GeolocationData = {
+							questionId,
+							geolocation: geolocationCoords
+						};
+						console.log(`Found geolocation from Geo Stamp in question ${questionId}: ${geolocationCoords}`);
+						return geolocationData;
+					} else {
+						console.log(`Geo Stamp widget found but could not extract lat/lon in question ${questionId}`);
+					}
 				} else {
-					console.log(`Detected Location field found but no valid coordinates in question ${questionId}`);
+					console.log(`Geo Stamp widget found but no valid data in question ${questionId}`);
 				}
 			}
 		}
 	}
 	
-	console.log('No Detected Location field found');
+	console.log('No Geo Stamp widget found');
 	return null;
 }
