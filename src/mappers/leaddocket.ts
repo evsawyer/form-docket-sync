@@ -54,7 +54,7 @@ export function mapToLeadDocketFormat(inputParams: any): any {
 		project_id: inputParams.project_id || null,
 		
 		// Add any other fields you want to track
-		__guid: `jotform_${inputParams.submission_id}`,
+		__guid: crypto.randomUUID(),
 		hash: inputParams.hash_data?.hash || inputParams.submission_id, // Use generated hash or fallback to submission ID
 		
 		// Additional hash-related fields
