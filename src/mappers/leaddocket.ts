@@ -75,13 +75,20 @@ export async function mapToLeadDocketFormat(inputParams: any): Promise<any> {
 		signature_data_image_hash: inputParams.hash_data?.signature_data_image ? 'present' : 'missing'
 	};
 	
-	// Add eligibility questions as separate fields
+	// Add eligibility questions and answers as separate fields
 	if (inputParams.eligibility_questions) {
-		console.log('Adding eligibility questions to LeadDocket data...');
+		console.log('Adding eligibility questions and answers to LeadDocket data...');
 		for (const [questionId, questionData] of Object.entries(inputParams.eligibility_questions)) {
 			const data = questionData as any;
-			leadDocketData[questionId] = data.answer;
-			console.log(`Added ${questionId}: ${data.answer}`);
+			
+			// Add the question
+			leadDocketData[questionId] = data.text;
+			console.log(`Added ${questionId}: ${data.text}`);
+			
+			// Add the corresponding answer
+			const answerId = questionId.replace('eligibility_question_', 'eligibility_answer_');
+			leadDocketData[answerId] = data.answer;
+			console.log(`Added ${answerId}: ${data.answer}`);
 		}
 	}
 	
