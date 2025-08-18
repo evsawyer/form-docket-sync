@@ -6,7 +6,7 @@ import { getAddressFromSubmission } from '../extractors/address';
 import { getNameFromSubmission, getEmailFromSubmission, getPhoneFromSubmission } from '../extractors/contact';
 import { getUserAgentFromSubmission, getGeolocationFromSubmission } from '../extractors/metadata';
 import { getHiddenFieldsFromSubmission, getEligibilityQuestionsFromSubmission } from '../extractors/fields';
-import { getFormattedDates } from '../processors/dates';
+import { getFormattedDates } from '../processors/timestamp';
 import { getRetainerFromSubmission } from '../extractors/retainer';
 
 // Helper function for background processing after webhook response
