@@ -82,8 +82,8 @@ export async function mapToLeadDocketFormat(inputParams: any): Promise<any> {
 			const data = questionData as any;
 			
 			// Add the question
-			leadDocketData[questionId] = data.text;
-			console.log(`Added ${questionId}: ${data.text}`);
+			leadDocketData[questionId] = data.question;
+			console.log(`Added ${questionId}: ${data.question}`);
 			
 			// Add the corresponding answer
 			const answerId = questionId.replace('eligibility_question_', 'eligibility_answer_');
