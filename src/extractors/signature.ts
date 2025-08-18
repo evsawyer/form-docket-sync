@@ -26,8 +26,12 @@ export async function getSignatureFromSubmission(submissionData: JotFormSubmissi
 					const arrayBuffer = await imageBlob.arrayBuffer();
 					const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 					
-					console.log(`Successfully converted signature to base64 (${base64.length} characters)`);
-					return base64;
+					// Add data URI preamble to indicate this is a signature image
+					const mimeType = imageBlob.type || 'image/png';
+					const base64WithPreamble = `data:${mimeType};base64,${base64}`;
+					
+					console.log(`Successfully converted signature to base64 with preamble (${base64WithPreamble.length} characters)`);
+					return base64WithPreamble;
 				} catch (error) {
 					console.error('Error fetching/converting signature:', error);
 					return null;

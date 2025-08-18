@@ -11,26 +11,26 @@ export function mapToLeadDocketFormat(inputParams: any): any {
 		tsa_timestamp: convertToLeadDocketTimestamp(inputParams.created_at),
 		tsa_timestamp_utc: new Date(inputParams.created_at).toUTCString(),
 		geolocation: inputParams.geolocation,
-		hash: inputParams.hash_data?.hash || inputParams.submission_id, // Use generated hash or fallback to submission ID
+		hash: inputParams.hash_data?.hash, // Use generated hash
 		user_agent: inputParams.user_agent,
 		// potential_robot: inputParams.potential_robot, // Not currently defined
 		
 		// Form metadata
 		tfa_dbFormId: inputParams.form_id,
 		tfa_dbVersionId: inputParams.submission_id,
-		// control_codes: inputParams.control_codes, // Not currently defined
+		// control_codes: inputParams.control_codes, // Not required
 		
 		// Business fields from hidden form fields
-		client_id: inputParams.client_id || null,
-		project_id: inputParams.project_id || null,
-		case_type: inputParams.case_type || "lead",
+		client_id: inputParams.client_id,
+		project_id: inputParams.project_id,
+		case_type: inputParams.case_type,
 		
 		// UTM and tracking fields from hidden form fields (with fallbacks)
-		utm_campaign: inputParams.utm_campaign || inputParams.form_title || "form_submission",
-		utm_source: inputParams.utm_source || "jotform",
-		utm_medium: "form",
-		utm_term: inputParams.utm_term || null,
-		utm_content: inputParams.utm_content || null,
+		utm_campaign: inputParams.utm_campaign,
+		utm_source: inputParams.utm_source,
+		utm_medium: inputParams.utm_medium,
+		utm_term: inputParams.utm_term,
+		utm_content: inputParams.utm_content,
 		
 		// Basic contact information
 		first_name: inputParams.first_name,
