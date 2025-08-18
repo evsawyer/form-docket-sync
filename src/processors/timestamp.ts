@@ -6,16 +6,16 @@ export function convertToLeadDocketTimestamp(jotFormTimestamp: string): string {
 		// JotForm format: "2025-08-06 16:37:50"
 		// LeadDocket format: "Mon Apr 21 2025 07:15:01 GMT-0500 (Central Daylight Time)"
 		
-		// Parse the JotForm timestamp - assuming it's already in Central Time
-		// Parse manually to avoid timezone interpretation issues
+		// Parse the JotForm timestamp - assuming it's in Eastern Time, convert to Central Time
 		const parts = jotFormTimestamp.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
 		if (!parts) {
 			throw new Error('Invalid timestamp format');
 		}
 		
 		const [, year, month, day, hour, minute, second] = parts;
-		// Create date assuming the timestamp is already in Central Time
-		const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute), parseInt(second));
+		// Create date with Eastern Time offset, then it will be automatically converted
+		const easternDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}-04:00`); // EDT offset
+		const date = easternDate;
 		
 		// Format to LeadDocket's expected format: "Mon Apr 21 2025 07:15:01 GMT-0500 (Central Daylight Time)"
 		// Using toLocaleString with specific options to match exact format
