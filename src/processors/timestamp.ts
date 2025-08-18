@@ -6,8 +6,16 @@ export function convertToLeadDocketTimestamp(jotFormTimestamp: string): string {
 		// JotForm format: "2025-08-06 16:37:50"
 		// LeadDocket format: "Mon Apr 21 2025 07:15:01 GMT-0500 (Central Daylight Time)"
 		
-		// Parse the JotForm timestamp (assuming it's in UTC or server timezone)
-		const date = new Date(jotFormTimestamp);
+		// Parse the JotForm timestamp - assuming it's already in Central Time
+		// Parse manually to avoid timezone interpretation issues
+		const parts = jotFormTimestamp.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+		if (!parts) {
+			throw new Error('Invalid timestamp format');
+		}
+		
+		const [, year, month, day, hour, minute, second] = parts;
+		// Create date assuming the timestamp is already in Central Time
+		const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute), parseInt(second));
 		
 		// Format to LeadDocket's expected format: "Mon Apr 21 2025 07:15:01 GMT-0500 (Central Daylight Time)"
 		// Using toLocaleString with specific options to match exact format
@@ -22,8 +30,9 @@ export function convertToLeadDocketTimestamp(jotFormTimestamp: string): string {
 			second: '2-digit',   // 01
 			hour12: false,       // 24-hour format instead of 12-hour
 			timeZoneName: 'longOffset' // GMT-0500 or GMT-0600
-		}).replace(/,/g, '').replace(/GMT([+-]\d{4})/, (match, offset) => {
-			// Determine timezone name based on offset
+		}).replace(/,/g, '').replace(/GMT([+-]\d{2}):?(\d{2})/, (match, hourOffset, minuteOffset) => {
+			// Reconstruct offset without colon and determine timezone name
+			const offset = `${hourOffset}${minuteOffset}`;
 			const timezoneName = offset === '-0500' ? 'Central Daylight Time' : 'Central Standard Time';
 			return `GMT${offset} (${timezoneName})`;
 		});
@@ -41,7 +50,26 @@ export function convertToLeadDocketTimestamp(jotFormTimestamp: string): string {
 // Helper function to convert JotForm timestamp to UTC format: "Mon, 21 Apr 2025 12:15:01 GMT"
 export function convertToUTCTimestamp(jotFormTimestamp: string): string {
 	try {
-		const date = new Date(jotFormTimestamp);
+		// Parse the JotForm timestamp manually and assume it's in Eastern Time
+		const parts = jotFormTimestamp.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+		if (!parts) {
+			throw new Error('Invalid timestamp format');
+		}
+		
+		const [, year, month, day, hour, minute, second] = parts;
+		// Create a date string that explicitly indicates Eastern Time
+		const easternTimeString = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+		
+		// Use toLocaleString to convert Eastern Time to UTC
+		const easternDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+		
+		// Get the UTC equivalent by treating the input as Eastern Time
+		const utcTime = easternDate.toLocaleString('en-US', { timeZone: 'America/New_York' });
+		const utcDate = new Date(utcTime);
+		
+		// Actually, let's use a simpler approach - create date and convert timezone
+		const tempDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}-04:00`); // EDT offset
+		const date = new Date(tempDate.getTime());
 		
 		// Format UTC timestamp using toLocaleString with UTC timezone
 		const utcFormatted = date.toLocaleString('en-US', {
