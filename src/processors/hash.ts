@@ -1,8 +1,35 @@
 import { JotFormSubmissionResponse } from '../types/jotform';
 import { HashData } from '../types/common';
 
-// Helper function to create a hash from retainer text, signature base64, and created_at
-export async function createHash(submissionData: JotFormSubmissionResponse | null, signatureBase64: string | null): Promise<HashData> {
+// Helper function to create a hash from specific parameters
+export async function createHash(tsaTimestampUtc: string | null, retainerText: string | null, signatureBase64: string | null): Promise<string> {
+	// Create hash from the provided parameters
+	const hashInput = [
+		retainerText || '',
+		signatureBase64 || '',
+		tsaTimestampUtc || ''
+	].join('|');
+
+	try {
+		// Create SHA-256 hash using Cloudflare Workers crypto API
+		const encoder = new TextEncoder();
+		const data = encoder.encode(hashInput);
+		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+		const hashArray = Array.from(new Uint8Array(hashBuffer));
+		const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+		console.log(`Created SHA-256 hash: ${hash}`);
+		return hash;
+	} catch (error) {
+		console.error('Error creating crypto hash:', error);
+		// Fallback to a simple base64-based hash if crypto fails
+		const fallbackHash = btoa(hashInput).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+		console.log(`Created fallback hash: ${fallbackHash}`);
+		return fallbackHash;
+	}
+}
+
+// Legacy function to create a hash from retainer text, signature base64, and created_at (keeping for backward compatibility)
+export async function createHashLegacy(submissionData: JotFormSubmissionResponse | null, signatureBase64: string | null): Promise<HashData> {
 	const hashData: HashData = {
 		retainer_text: null,
 		signature_data_image: signatureBase64,

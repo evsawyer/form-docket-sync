@@ -7,6 +7,8 @@ import { getNameFromSubmission, getEmailFromSubmission, getPhoneFromSubmission }
 import { getUserAgentFromSubmission, getGeolocationFromSubmission } from '../extractors/metadata';
 import { getHiddenFieldsFromSubmission, getEligibilityQuestionsFromSubmission } from '../extractors/fields';
 import { createHash } from '../processors/hash';
+import { getFormattedDates } from '../processors/dates';
+import { getRetainerFromSubmission } from '../extractors/retainer';
 
 // Helper function for background processing after webhook response
 export async function processWebhookInBackground(submissionId: string, formId: string, formTitle: string, jotformApiKey: string, leadDocketApiKey: string) {
@@ -40,6 +42,8 @@ export async function processWebhookInBackground(submissionId: string, formId: s
 		const geolocationData = getGeolocationFromSubmission(submissionData);
 		const hiddenFields = getHiddenFieldsFromSubmission(submissionData);
 		const eligibilityQuestions = getEligibilityQuestionsFromSubmission(submissionData);
+		const retainerData = getRetainerFromSubmission(submissionData);
+		const formattedDates = getFormattedDates(submissionData);
 		const hashData = await createHash(submissionData, signatureBase64);
 
 		// Build the consolidated input parameters
@@ -79,6 +83,13 @@ export async function processWebhookInBackground(submissionId: string, formId: s
 			created_at: submissionData.content.created_at,
 			form_title: formTitle,
 			
+			// Formatted dates
+			tsa_timestamp: formattedDates.tsa_timestamp,
+			tsa_timestamp_utc: formattedDates.tsa_timestamp_utc,
+			
+			// Retainer text
+			retainer_text: retainerData?.retainer_text || null,
+			
 			// Hidden fields from form
 			client_id: hiddenFields.client_id,
 			case_type: hiddenFields.case_type,
@@ -103,7 +114,9 @@ export async function processWebhookInBackground(submissionId: string, formId: s
 				hidden_fields: hiddenFields,
 				eligibility_questions: eligibilityQuestions,
 				geolocation: geolocationData,
-				hash_data: hashData
+				hash_data: hashData,
+				formatted_dates: formattedDates,
+				retainer_data: retainerData
 			}
 		};
 
@@ -111,7 +124,7 @@ export async function processWebhookInBackground(submissionId: string, formId: s
 		console.log('Processed webhook input params:', JSON.stringify(inputParams, null, 2));
 		
 		// Map to LeadDocket format and send
-		const leadDocketData = mapToLeadDocketFormat(inputParams);
+		const leadDocketData = await mapToLeadDocketFormat(inputParams);
 		console.log('Mapped LeadDocket data:', JSON.stringify(leadDocketData, null, 2));
 		
 		const leadDocketResult = await sendToLeadDocket(leadDocketData, leadDocketApiKey);

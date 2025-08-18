@@ -1,17 +1,22 @@
 import { getStateAbbreviation } from '../processors/state';
 import { convertToLeadDocketTimestamp } from '../processors/timestamp';
+import { createHash } from '../processors/hash';
 
 // Helper function to map our extracted data to LeadDocket format
-export function mapToLeadDocketFormat(inputParams: any): any {
+export async function mapToLeadDocketFormat(inputParams: any): Promise<any> {
 	// Build the base object first
 	const leadDocketData: any = {
 		// Core tracking fields
 		__guid: crypto.randomUUID(),
 		ip_address: inputParams.ip_address,
-		tsa_timestamp: convertToLeadDocketTimestamp(inputParams.created_at),
-		tsa_timestamp_utc: new Date(inputParams.created_at).toUTCString(),
+		tsa_timestamp: inputParams.tsa_timestamp,
+		tsa_timestamp_utc: inputParams.tsa_timestamp_utc,
 		geolocation: inputParams.geolocation,
-		hash: inputParams.hash_data?.hash, // Use generated hash
+		hash: await createHash(
+			inputParams.tsa_timestamp_utc,
+			inputParams.retainer_text,
+			inputParams.signature_base64
+		), // Create hash directly in object
 		user_agent: inputParams.user_agent,
 		// potential_robot: inputParams.potential_robot, // Not currently defined
 		
@@ -61,6 +66,9 @@ export function mapToLeadDocketFormat(inputParams: any): any {
 		// esignature_pointCount: inputParams.esignature_pointCount, // Not currently defined
 		// esignature_strokeCount: inputParams.esignature_strokeCount, // Not currently defined
 		// esignature_maxStrokeLength: inputParams.esignature_maxStrokeLength, // Not currently defined
+		
+		// Retainer text content
+		Retainer_HTML: inputParams.retainer_text,
 		
 		// Additional hash-related fields
 		retainer_text_hash: inputParams.hash_data?.retainer_text ? 'present' : 'missing',
