@@ -5,57 +5,62 @@ import { convertToLeadDocketTimestamp } from '../processors/timestamp';
 export function mapToLeadDocketFormat(inputParams: any): any {
 	// Build the base object first
 	const leadDocketData: any = {
+		// Core tracking fields
+		__guid: crypto.randomUUID(),
+		ip_address: inputParams.ip_address,
+		tsa_timestamp: convertToLeadDocketTimestamp(inputParams.created_at),
+		tsa_timestamp_utc: new Date(inputParams.created_at).toUTCString(),
+		geolocation: inputParams.geolocation,
+		hash: inputParams.hash_data?.hash || inputParams.submission_id, // Use generated hash or fallback to submission ID
+		user_agent: inputParams.user_agent,
+		// potential_robot: inputParams.potential_robot, // Not currently defined
+		
+		// Form metadata
+		tfa_dbFormId: inputParams.form_id,
+		tfa_dbVersionId: inputParams.submission_id,
+		// control_codes: inputParams.control_codes, // Not currently defined
+		
+		// Business fields from hidden form fields
+		client_id: inputParams.client_id || null,
+		project_id: inputParams.project_id || null,
+		case_type: inputParams.case_type || "lead",
+		
+		// UTM and tracking fields from hidden form fields (with fallbacks)
+		utm_campaign: inputParams.utm_campaign || inputParams.form_title || "form_submission",
+		utm_source: inputParams.utm_source || "jotform",
+		utm_medium: "form",
+		utm_term: inputParams.utm_term || null,
+		utm_content: inputParams.utm_content || null,
+		
 		// Basic contact information
 		first_name: inputParams.first_name,
 		last_name: inputParams.last_name,
-		phone_number: inputParams.phone_number,
-		email_address: inputParams.email_address,
 		
 		// Address information
 		address_line_1: inputParams.address_line_1,
 		address_line_2: inputParams.address_line_2,
 		city: inputParams.city,
-		state_name: inputParams.state, // Note: LeadDocket uses "state_name" not "state"
-		state_abbr: getStateAbbreviation(inputParams.state), // Auto-convert state name to abbreviation
 		state: inputParams.state && getStateAbbreviation(inputParams.state) 
 			? `${getStateAbbreviation(inputParams.state)} - ${inputParams.state}` 
 			: inputParams.state, // Format: "IL - Illinois"
+		state_abbr: getStateAbbreviation(inputParams.state), // Auto-convert state name to abbreviation
+		state_name: inputParams.state, // Note: LeadDocket uses "state_name" not "state"
 		zip_code: inputParams.zip_code,
 		
-		// Technical metadata
-		ip_address: inputParams.ip_address,
-		user_agent: inputParams.user_agent,
-		geolocation: inputParams.geolocation,
-		
-		// Signature data (base64 image)
-		signature_data_image: inputParams.signature_base64,
-		
-		// Form metadata
-		tfa_dbFormId: inputParams.form_id,
-		tfa_dbVersionId: inputParams.submission_id,
-		
-		// Timestamps
-		tsa_timestamp: convertToLeadDocketTimestamp(inputParams.created_at),
-		tsa_timestamp_utc: new Date(inputParams.created_at).toUTCString(),
+		// Contact information
+		email_address: inputParams.email_address,
+		phone_number: inputParams.phone_number,
 		
 		// Additional metadata
 		JSON_DATA: JSON.stringify(inputParams.all_data),
 		
-		// UTM and tracking fields from hidden form fields (with fallbacks)
-		utm_source: inputParams.utm_source || "jotform",
-		utm_medium: "form",
-		utm_campaign: inputParams.utm_campaign || inputParams.form_title || "form_submission",
-		utm_term: inputParams.utm_term || null,
-		utm_content: inputParams.utm_content || null,
-		
-		// Business fields from hidden form fields
-		case_type: inputParams.case_type || "lead",
-		client_id: inputParams.client_id || null,
-		project_id: inputParams.project_id || null,
-		
-		// Add any other fields you want to track
-		__guid: crypto.randomUUID(),
-		hash: inputParams.hash_data?.hash || inputParams.submission_id, // Use generated hash or fallback to submission ID
+		// Signature data (base64 image)
+		signature_data_image: inputParams.signature_base64,
+		// signature_data_svgbase64: inputParams.signature_data_svgbase64, // Not currently defined
+		// signatory_name: inputParams.signatory_name, // Not currently defined
+		// esignature_pointCount: inputParams.esignature_pointCount, // Not currently defined
+		// esignature_strokeCount: inputParams.esignature_strokeCount, // Not currently defined
+		// esignature_maxStrokeLength: inputParams.esignature_maxStrokeLength, // Not currently defined
 		
 		// Additional hash-related fields
 		retainer_text_hash: inputParams.hash_data?.retainer_text ? 'present' : 'missing',
