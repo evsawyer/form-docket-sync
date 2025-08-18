@@ -6,7 +6,6 @@ import { getAddressFromSubmission } from '../extractors/address';
 import { getNameFromSubmission, getEmailFromSubmission, getPhoneFromSubmission } from '../extractors/contact';
 import { getUserAgentFromSubmission, getGeolocationFromSubmission } from '../extractors/metadata';
 import { getHiddenFieldsFromSubmission, getEligibilityQuestionsFromSubmission } from '../extractors/fields';
-import { createHash } from '../processors/hash';
 import { getFormattedDates } from '../processors/dates';
 import { getRetainerFromSubmission } from '../extractors/retainer';
 
@@ -44,7 +43,6 @@ export async function processWebhookInBackground(submissionId: string, formId: s
 		const eligibilityQuestions = getEligibilityQuestionsFromSubmission(submissionData);
 		const retainerData = getRetainerFromSubmission(submissionData);
 		const formattedDates = getFormattedDates(submissionData);
-		const hashData = await createHash(submissionData, signatureBase64);
 
 		// Build the consolidated input parameters
 		const inputParams = {
@@ -102,9 +100,6 @@ export async function processWebhookInBackground(submissionId: string, formId: s
 			// Eligibility questions from form
 			eligibility_questions: eligibilityQuestions,
 			
-			// Hash data from retainer text, signature, and created_at
-			hash_data: hashData,
-			
 			// Include arrays of all found instances (in case there are multiple)
 			all_data: {
 				names: names,
@@ -114,7 +109,6 @@ export async function processWebhookInBackground(submissionId: string, formId: s
 				hidden_fields: hiddenFields,
 				eligibility_questions: eligibilityQuestions,
 				geolocation: geolocationData,
-				hash_data: hashData,
 				formatted_dates: formattedDates,
 				retainer_data: retainerData
 			}
