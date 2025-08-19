@@ -13,16 +13,12 @@ export function convertToLeadDocketTimestamp(jotFormTimestamp: string): string {
 		}
 		
 		const [, year, month, day, hour, minute, second] = parts;
-		// Create date with EST offset (-05:00 for EST, -04:00 for EDT)
-		// Using -05:00 as you specified EST (not EDT)
+		// Create date with EST offset (-05:00 for EST)
+		// This will automatically convert EST to UTC internally
 		const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}-05:00`);
 		
-		// Convert to Central Time and use toString() format
-		const centralTime = date.toLocaleString('en-US', { timeZone: 'America/Chicago' });
-		const centralDate = new Date(centralTime);
-		
-		// Use the simple toString() method - it gives us exactly what we need!
-		const formattedDate = centralDate.toString();
+		// Use toString() - this will show UTC time (server timezone) but correctly converted
+		const formattedDate = date.toString();
 		
 		console.log(`Converted timestamp: "${jotFormTimestamp}" → "${formattedDate}"`);
 		return formattedDate;
