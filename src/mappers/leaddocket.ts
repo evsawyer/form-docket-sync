@@ -18,7 +18,7 @@ export async function mapToLeadDocketFormat(inputParams: any): Promise<any> {
 			inputParams.signature_base64
 		), // Create hash directly in object
 		user_agent: inputParams.user_agent,
-		// potential_robot: inputParams.potential_robot, // Not currently defined
+		potential_robot: "false", // Default to false
 		
 		// Form metadata
 		tfa_dbFormId: inputParams.form_id,
