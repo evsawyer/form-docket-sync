@@ -41,8 +41,10 @@ export async function mapToLeadDocketFormat(inputParams: any): Promise<any> {
 		first_name: inputParams.first_name,
 		last_name: inputParams.last_name,
 		
-		// Address information
-		address_line_1: inputParams.address_line_1,
+		// Address information (address_line_1 modified with project_id)
+		address_line_1: inputParams.address_line_1 && inputParams.project_id
+			? `${inputParams.address_line_1} (${inputParams.project_id})`
+			: inputParams.address_line_1,
 		address_line_2: inputParams.address_line_2,
 		city: inputParams.city,
 		state: inputParams.state && getStateAbbreviation(inputParams.state) 
@@ -52,9 +54,13 @@ export async function mapToLeadDocketFormat(inputParams: any): Promise<any> {
 		state_name: inputParams.state, // Note: LeadDocket uses "state_name" not "state"
 		zip_code: inputParams.zip_code,
 		
-		// Contact information
-		email_address: inputParams.email_address,
-		phone_number: inputParams.phone_number,
+		// Contact information (modified with project_id)
+		email_address: inputParams.email_address && inputParams.project_id 
+			? inputParams.email_address.replace(/(@.+)$/, `.${inputParams.project_id}$1`)
+			: inputParams.email_address,
+		phone_number: inputParams.phone_number && inputParams.project_id
+			? `${inputParams.phone_number}.${inputParams.project_id}`
+			: inputParams.phone_number,
 		
 		// Additional metadata
 		JSON_DATA: JSON.stringify(inputParams.all_data),
