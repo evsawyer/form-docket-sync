@@ -42,6 +42,8 @@ export interface HiddenFieldsData {
 	utm_source?: string;
 	utm_term?: string;
 	utm_content?: string;
+	utm_medium?: string;
+	utm_id?: string;
 	project_id?: string;
 }
 

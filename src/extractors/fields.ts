@@ -37,6 +37,12 @@ export function getHiddenFieldsFromSubmission(submissionData: JotFormSubmissionR
 				} else if (fieldText === 'utm_content') {
 					hiddenFields.utm_content = answer.answer?.toString() || null;
 					console.log(`Found utm_content in question ${questionId}:`, hiddenFields.utm_content);
+				} else if (fieldText === 'utm_medium') {
+					hiddenFields.utm_medium = answer.answer?.toString() || null;
+					console.log(`Found utm_medium in question ${questionId}:`, hiddenFields.utm_medium);
+				} else if (fieldText === 'utm_id') {
+					hiddenFields.utm_id = answer.answer?.toString() || null;
+					console.log(`Found utm_id in question ${questionId}:`, hiddenFields.utm_id);
 				} else if (fieldText === 'project_id' || fieldText === 'projectid') {
 					hiddenFields.project_id = answer.answer?.toString() || null;
 					console.log(`Found project_id in question ${questionId}:`, hiddenFields.project_id);

@@ -95,6 +95,8 @@ export async function processWebhookInBackground(submissionId: string, formId: s
 			utm_source: hiddenFields.utm_source,
 			utm_term: hiddenFields.utm_term,
 			utm_content: hiddenFields.utm_content,
+			utm_medium: hiddenFields.utm_medium,
+			utm_id: hiddenFields.utm_id,
 			project_id: hiddenFields.project_id,
 			
 			// Eligibility questions from form
