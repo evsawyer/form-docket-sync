@@ -72,7 +72,7 @@ export async function mapToLeadDocketFormat(inputParams: any): Promise<any> {
 		// esignature_strokeCount: inputParams.esignature_strokeCount, // Not currently defined
 		// esignature_maxStrokeLength: inputParams.esignature_maxStrokeLength, // Not currently defined
 		
-		// Retainer text content
+		// Retainer text content (converted to base64)
 		Retainer_HTML: inputParams.retainer_text,
 		
 		// Additional hash-related fields
