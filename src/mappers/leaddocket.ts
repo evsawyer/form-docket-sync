@@ -1,5 +1,4 @@
 import { getStateAbbreviation } from '../processors/state';
-import { convertToLeadDocketTimestamp } from '../processors/timestamp';
 import { createHash } from '../processors/hash';
 
 // Helper function to map our extracted data to LeadDocket format
@@ -63,7 +62,7 @@ export async function mapToLeadDocketFormat(inputParams: any): Promise<any> {
 			: inputParams.phone_number,
 		
 		// Additional metadata
-		JSON_DATA: JSON.stringify(inputParams.all_data),
+		// JSON_DATA: JSON.stringify(inputParams.all_data),
 		
 		// Signature data (base64 image)
 		signature_data_image: inputParams.signature_base64,
@@ -77,8 +76,8 @@ export async function mapToLeadDocketFormat(inputParams: any): Promise<any> {
 		Retainer_HTML: inputParams.retainer_text,
 		
 		// Additional hash-related fields
-		retainer_text_hash: inputParams.hash_data?.retainer_text ? 'present' : 'missing',
-		signature_data_image_hash: inputParams.hash_data?.signature_data_image ? 'present' : 'missing'
+		// retainer_text_hash: inputParams.hash_data?.retainer_text ? 'present' : 'missing',
+		// signature_data_image_hash: inputParams.hash_data?.signature_data_image ? 'present' : 'missing'
 	};
 	
 	// Add eligibility questions and answers as separate fields
