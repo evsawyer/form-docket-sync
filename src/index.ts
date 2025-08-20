@@ -35,51 +35,51 @@ app.get('/', (c) => {
 });
 
 // GET endpoint to fetch and log complete JotForm submission data
-app.get('/submission/:submissionId', async (c) => {
-	const submissionId = c.req.param('submissionId');
+// app.get('/submission/:submissionId', async (c) => {
+// 	const submissionId = c.req.param('submissionId');
 	
-	if (!submissionId) {
-		return c.json({ 
-			error: 'Missing required parameter: submissionId' 
-		}, 400);
-	}
+// 	if (!submissionId) {
+// 		return c.json({ 
+// 			error: 'Missing required parameter: submissionId' 
+// 		}, 400);
+// 	}
 
-	try {
-		console.log(`=== Manual Submission Fetch for ${submissionId} ===`);
-		console.log(`Fetching submission details for ID: ${submissionId}`);
-		console.log(`Equivalent curl command:`);
-		console.log(`curl -X GET "https://api.jotform.com/submission/${submissionId}?apiKey=${c.env.JOTFORM_API_KEY.substring(0, 8)}..."`);
+// 	try {
+// 		console.log(`=== Manual Submission Fetch for ${submissionId} ===`);
+// 		console.log(`Fetching submission details for ID: ${submissionId}`);
+// 		console.log(`Equivalent curl command:`);
+// 		console.log(`curl -X GET "https://api.jotform.com/submission/${submissionId}?apiKey=${c.env.JOTFORM_API_KEY.substring(0, 8)}..."`);
 		
-		const submissionData = await getSubmissionDetails(submissionId, c.env.JOTFORM_API_KEY);
+// 		const submissionData = await getSubmissionDetails(submissionId, c.env.JOTFORM_API_KEY);
 		
-		if (!submissionData) {
-			console.error('Failed to fetch submission details from JotForm API');
-			return c.json({ 
-				error: 'Failed to fetch submission details from JotForm API' 
-			}, 500);
-		}
+// 		if (!submissionData) {
+// 			console.error('Failed to fetch submission details from JotForm API');
+// 			return c.json({ 
+// 				error: 'Failed to fetch submission details from JotForm API' 
+// 			}, 500);
+// 		}
 
-		console.log(`Successfully fetched submission data for ${submissionId}`);
-		console.log(`=== FULL JOTFORM SUBMISSION DATA ===`);
-		console.log(JSON.stringify(submissionData, null, 2));
-		console.log(`=== END JOTFORM SUBMISSION DATA ===`);
+// 		console.log(`Successfully fetched submission data for ${submissionId}`);
+// 		console.log(`=== FULL JOTFORM SUBMISSION DATA ===`);
+// 		console.log(JSON.stringify(submissionData, null, 2));
+// 		console.log(`=== END JOTFORM SUBMISSION DATA ===`);
 
-		// Return the complete submission data
-		return c.json({
-			success: true,
-			submissionId: submissionId,
-			curlCommand: `curl -X GET "https://api.jotform.com/submission/${submissionId}?apiKey=YOUR_API_KEY"`,
-			data: submissionData
-		});
+// 		// Return the complete submission data
+// 		return c.json({
+// 			success: true,
+// 			submissionId: submissionId,
+// 			curlCommand: `curl -X GET "https://api.jotform.com/submission/${submissionId}?apiKey=YOUR_API_KEY"`,
+// 			data: submissionData
+// 		});
 
-	} catch (error) {
-		console.error('Error fetching submission:', error);
-		return c.json({ 
-			error: 'Failed to fetch submission',
-			message: error instanceof Error ? error.message : 'Unknown error'
-		}, 500);
-	}
-});
+// 	} catch (error) {
+// 		console.error('Error fetching submission:', error);
+// 		return c.json({ 
+// 			error: 'Failed to fetch submission',
+// 			message: error instanceof Error ? error.message : 'Unknown error'
+// 		}, 500);
+// 	}
+// });
 
 // JotForm webhook endpoint - receives POST requests from JotForm
 app.post('/webhook', async (c) => {
