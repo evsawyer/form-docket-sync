@@ -6,7 +6,7 @@ import { getAddressFromSubmission } from '../extractors/address';
 import { getNameFromSubmission, getEmailFromSubmission, getPhoneFromSubmission } from '../extractors/contact';
 import { getUserAgentFromSubmission, getGeolocationFromSubmission } from '../extractors/metadata';
 import { getHiddenFieldsFromSubmission, getEligibilityQuestionsFromSubmission } from '../extractors/fields';
-import { getFormattedDates } from '../processors/timestamp';
+import { getTimestamps } from '../processors/timestamp';
 import { getRetainerFromSubmission } from '../extractors/retainer';
 
 // Helper function for background processing after webhook response
@@ -42,7 +42,7 @@ export async function processWebhookInBackground(submissionId: string, formId: s
 		const hiddenFields = getHiddenFieldsFromSubmission(submissionData);
 		const eligibilityQuestions = getEligibilityQuestionsFromSubmission(submissionData);
 		const retainerData = getRetainerFromSubmission(submissionData);
-		const formattedDates = getFormattedDates(submissionData);
+		const formattedDates = getTimestamps();
 
 		// Build the consolidated input parameters
 		const inputParams = {
