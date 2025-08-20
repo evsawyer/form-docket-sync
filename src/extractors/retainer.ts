@@ -48,14 +48,17 @@ export function getRetainerFromSubmission(submissionData: JotFormSubmissionRespo
 	// Concatenate all retainer texts in order
 	const concatenatedText = retainerFields.map(field => field.text).join('\n\n');
 	
+	// Convert to base64 (handle Unicode characters properly)
+	const base64Text = btoa(new TextEncoder().encode(concatenatedText).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+	
 	// Use the first questionId as the representative ID
 	const representativeQuestionId = retainerFields[0].questionId;
 
-	console.log(`Concatenated ${retainerFields.length} retainer field(s) into single text (total length: ${concatenatedText.length})`);
+	console.log(`Concatenated ${retainerFields.length} retainer field(s) into single text (original length: ${concatenatedText.length}, base64 length: ${base64Text.length})`);
 
 	return {
 		questionId: representativeQuestionId,
-		retainer_text: concatenatedText
+		retainer_text: base64Text
 	};
 }
 

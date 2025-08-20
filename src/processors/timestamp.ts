@@ -48,4 +48,3 @@ export function getFormattedDates(submissionData: JotFormSubmissionResponse | nu
 	const createdAt = submissionData.content.created_at;
 	return convertToLeadDocketTimestamp(createdAt);
 }
-}
