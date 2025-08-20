@@ -1,11 +1,9 @@
 import { JotFormSubmissionResponse } from '../types/jotform';
 
-// Helper function to convert JotForm timestamp to LeadDocket format (Central Time)
-export function convertToLeadDocketTimestamp(jotFormTimestamp: string): string {
+// Helper function to convert JotForm timestamp to both local and UTC formats
+export function convertToLeadDocketTimestamp(jotFormTimestamp: string): { tsa_timestamp: string; tsa_timestamp_utc: string } {
 	try {
 		// JotForm format: "2025-08-06 16:37:50" (always EST)
-		// LeadDocket format: "Mon Apr 21 2025 07:15:01 GMT-0500 (Central Daylight Time)"
-		
 		// Parse the JotForm timestamp and create Date with EST timezone
 		const parts = jotFormTimestamp.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
 		if (!parts) {
@@ -17,45 +15,24 @@ export function convertToLeadDocketTimestamp(jotFormTimestamp: string): string {
 		// This will automatically convert EST to UTC internally
 		const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}-05:00`);
 		
-		// Use toString() - this will show UTC time (server timezone) but correctly converted
-		const formattedDate = date.toString();
+		// Get both formats
+		const localTimestamp = date.toString(); // Server timezone (UTC for Cloudflare)
+		const utcTimestamp = date.toUTCString(); // UTC format
 		
-		console.log(`Converted timestamp: "${jotFormTimestamp}" → "${formattedDate}"`);
-		return formattedDate;
+		console.log(`Converted timestamp: "${jotFormTimestamp}" → Local: "${localTimestamp}", UTC: "${utcTimestamp}"`);
+		
+		return {
+			tsa_timestamp: localTimestamp,
+			tsa_timestamp_utc: utcTimestamp
+		};
 		
 	} catch (error) {
 		console.error('Error converting timestamp:', error);
 		// Fallback to original timestamp if conversion fails
-		return jotFormTimestamp;
-	}
-}
-
-// Helper function to convert JotForm timestamp to UTC format: "Mon, 21 Apr 2025 12:15:01 GMT"
-export function convertToUTCTimestamp(jotFormTimestamp: string): string {
-	try {
-		// JotForm format: "2025-08-06 16:37:50" (always EST)
-		// UTC format: "Mon, 21 Apr 2025 12:15:01 GMT"
-		
-		// Parse the JotForm timestamp and create Date with EST timezone
-		const parts = jotFormTimestamp.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
-		if (!parts) {
-			throw new Error('Invalid timestamp format');
-		}
-		
-		const [, year, month, day, hour, minute, second] = parts;
-		// Create date with EST offset (-05:00)
-		const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}-05:00`);
-		
-		// Use the simple toUTCString() method - it gives us exactly what we need!
-		const formattedDate = date.toUTCString();
-		
-		console.log(`Converted UTC timestamp: "${jotFormTimestamp}" → "${formattedDate}"`);
-		return formattedDate;
-		
-	} catch (error) {
-		console.error('Error converting UTC timestamp:', error);
-		// Fallback to original timestamp if conversion fails
-		return jotFormTimestamp;
+		return {
+			tsa_timestamp: jotFormTimestamp,
+			tsa_timestamp_utc: jotFormTimestamp
+		};
 	}
 }
 
@@ -69,8 +46,6 @@ export function getFormattedDates(submissionData: JotFormSubmissionResponse | nu
 	}
 
 	const createdAt = submissionData.content.created_at;
-	return {
-		tsa_timestamp: convertToLeadDocketTimestamp(createdAt),
-		tsa_timestamp_utc: convertToUTCTimestamp(createdAt)
-	};
+	return convertToLeadDocketTimestamp(createdAt);
+}
 }
