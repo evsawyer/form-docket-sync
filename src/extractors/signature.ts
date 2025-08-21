@@ -28,7 +28,7 @@ export async function getSignatureFromSubmission(submissionData: JotFormSubmissi
 					
 					// Add data URI preamble to indicate this is a signature image
 					const mimeType = imageBlob.type || 'image/png';
-					const base64WithPreamble = `data:${mimeType};base64,${base64}`;
+					const base64WithPreamble = `${mimeType};base64,${base64}`;
 					
 					console.log(`Successfully converted signature to base64 with preamble (${base64WithPreamble.length} characters)`);
 					return base64WithPreamble;
