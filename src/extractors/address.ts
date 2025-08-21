@@ -69,13 +69,29 @@ export function parseAutocompletedAddress(submissionData: JotFormSubmissionRespo
 				}
 			}
 			
-			// Combine house number and street name for address line 1
-			const addressLine1 = houseNumber && streetName ? `${houseNumber} ${streetName}` : (streetName || houseNumber || null);
+			// Handle house number with "/" format (e.g., "unit a/1470")
+			let addressLine1 = null;
+			let addressLine2 = null;
+			
+			if (houseNumber && houseNumber.includes('/')) {
+				// Split house number on "/" - first part goes to line 2, second part to line 1
+				const parts = houseNumber.split('/');
+				const unitPart = parts[0]?.trim(); // "unit a"
+				const numberPart = parts[1]?.trim(); // "1470"
+				
+				addressLine2 = unitPart || null;
+				addressLine1 = numberPart && streetName ? `${numberPart} ${streetName}` : (streetName || numberPart || null);
+				
+				console.log(`Split house number "${houseNumber}" into unit: "${unitPart}" and number: "${numberPart}"`);
+			} else {
+				// Normal case - combine house number and street name for address line 1
+				addressLine1 = houseNumber && streetName ? `${houseNumber} ${streetName}` : (streetName || houseNumber || null);
+			}
 			
 			const parsedAddress: AddressData = {
 				questionId,
 				address_line_1: addressLine1,
-				address_line_2: null, // Autocompleted address doesn't seem to have line 2
+				address_line_2: addressLine2,
 				city: city || null,
 				state: state || null,
 				zip_code: postalCode || null
@@ -87,7 +103,8 @@ export function parseAutocompletedAddress(submissionData: JotFormSubmissionRespo
 				city,
 				state,
 				postalCode,
-				combinedAddressLine1: addressLine1
+				combinedAddressLine1: addressLine1,
+				addressLine2: addressLine2
 			});
 			
 			return parsedAddress;
