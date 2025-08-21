@@ -21,6 +21,7 @@ import { Bindings } from './types/environment';
 import { getSubmissionDetails } from './services/jotform';
 import { processWebhookInBackground } from './services/webhook';
 import { parseAutocompletedAddress } from './extractors/address';
+import { getStateAbbreviation, getStateName } from './processors/state';
 
 // Create Hono app with proper typing
 const app = new Hono<{ Bindings: Bindings }>();
@@ -116,15 +117,33 @@ app.post('/test-address', async (c) => {
 		// Test autocompleted address parsing
 		const testAddressData = parseAutocompletedAddress(submissionData);
 		
+		// Add formatted state fields if address was found
+		let formattedStateData = null;
+		if (testAddressData?.state) {
+			// JotForm provides state abbreviation (e.g., "CA"), so we need to get the full name
+			const stateAbbr = testAddressData.state; // This is already the abbreviation
+			const stateName = getStateName(stateAbbr); // Convert abbreviation to full name
+			
+			formattedStateData = {
+				state: stateName ? `${stateAbbr} - ${stateName}` : stateAbbr,
+				state_abbr: stateAbbr,
+				state_name: stateName
+			};
+		}
+		
 		console.log('=== TEST ADDRESS PARSING RESULTS ===');
 		console.log('Parsed Address Data:', JSON.stringify(testAddressData, null, 2));
+		if (formattedStateData) {
+			console.log('Formatted State Data:', JSON.stringify(formattedStateData, null, 2));
+		}
 		console.log('=== END TEST ADDRESS PARSING ===');
 
 		return c.json({ 
 			success: true,
 			message: 'Address parsing test completed',
 			submissionId: submissionId,
-			parsedAddress: testAddressData
+			parsedAddress: testAddressData,
+			formattedState: formattedStateData
 		});
 		
 	} catch (error) {
