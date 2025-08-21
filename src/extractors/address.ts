@@ -29,3 +29,71 @@ export function getAddressFromSubmission(submissionData: JotFormSubmissionRespon
 	
 	return addresses;
 }
+
+// Helper function to parse autocompleted address widget data
+export function parseAutocompletedAddress(submissionData: JotFormSubmissionResponse | null): AddressData | null {
+	if (!submissionData?.content?.answers) {
+		console.log('No submission data or answers provided');
+		return null;
+	}
+
+	for (const [questionId, answer] of Object.entries(submissionData.content.answers)) {
+		// Look for Autocompleted Address widget
+		if ((answer as any).cfname === 'Autocompleted Address' && answer.answer) {
+			console.log(`Found Autocompleted Address widget in question ${questionId}`);
+			console.log('Raw answer:', answer.answer);
+			
+			// Parse the multi-line address data
+			// Format: "Street name: Audiffred Lane\nHouse number: 116\nCity: Woodside\nState: CA\nPostal code: 94062\nCountry: United States"
+			const addressText = answer.answer as string;
+			const lines = addressText.split('\n');
+			
+			let streetName = '';
+			let houseNumber = '';
+			let city = '';
+			let state = '';
+			let postalCode = '';
+			
+			for (const line of lines) {
+				const trimmedLine = line.trim();
+				if (trimmedLine.startsWith('Street name: ')) {
+					streetName = trimmedLine.substring('Street name: '.length);
+				} else if (trimmedLine.startsWith('House number: ')) {
+					houseNumber = trimmedLine.substring('House number: '.length);
+				} else if (trimmedLine.startsWith('City: ')) {
+					city = trimmedLine.substring('City: '.length);
+				} else if (trimmedLine.startsWith('State: ')) {
+					state = trimmedLine.substring('State: '.length);
+				} else if (trimmedLine.startsWith('Postal code: ')) {
+					postalCode = trimmedLine.substring('Postal code: '.length);
+				}
+			}
+			
+			// Combine house number and street name for address line 1
+			const addressLine1 = houseNumber && streetName ? `${houseNumber} ${streetName}` : (streetName || houseNumber || null);
+			
+			const parsedAddress: AddressData = {
+				questionId,
+				address_line_1: addressLine1,
+				address_line_2: null, // Autocompleted address doesn't seem to have line 2
+				city: city || null,
+				state: state || null,
+				zip_code: postalCode || null
+			};
+			
+			console.log('Parsed address components:', {
+				streetName,
+				houseNumber,
+				city,
+				state,
+				postalCode,
+				combinedAddressLine1: addressLine1
+			});
+			
+			return parsedAddress;
+		}
+	}
+	
+	console.log('No Autocompleted Address widget found');
+	return null;
+}

@@ -20,6 +20,7 @@ import { Bindings } from './types/environment';
 // Import services
 import { getSubmissionDetails } from './services/jotform';
 import { processWebhookInBackground } from './services/webhook';
+import { parseAutocompletedAddress } from './extractors/address';
 
 // Create Hono app with proper typing
 const app = new Hono<{ Bindings: Bindings }>();
@@ -80,6 +81,60 @@ app.get('/', (c) => {
 // 		}, 500);
 // 	}
 // });
+
+// Test endpoint for autocompleted address parsing
+app.post('/test-address', async (c) => {
+	try {
+		console.log('=== Test Address Endpoint Received ===');
+		
+		// Extract submissionID from form data (same as webhook)
+		const formData = await c.req.formData();
+		const submissionId = formData.get('submissionID')?.toString();
+		const formId = formData.get('formID')?.toString();
+		const formTitle = formData.get('formTitle')?.toString();
+		
+		console.log(`Test Address: FormID=${formId}, SubmissionID=${submissionId}, Title="${formTitle}"`);
+		
+		if (!submissionId) {
+			console.error('No submissionID found in test payload');
+			return c.json({ 
+				error: 'Missing submissionID in test payload' 
+			}, 400);
+		}
+
+		// Fetch submission data to test address parsing
+		console.log(`Fetching submission details for address test: ${submissionId}`);
+		const submissionData = await getSubmissionDetails(submissionId, c.env.JOTFORM_API_KEY);
+		
+		if (!submissionData) {
+			console.error('Failed to fetch submission details from JotForm API');
+			return c.json({ 
+				error: 'Failed to fetch submission details from JotForm API' 
+			}, 500);
+		}
+
+		// Test autocompleted address parsing
+		const testAddressData = parseAutocompletedAddress(submissionData);
+		
+		console.log('=== TEST ADDRESS PARSING RESULTS ===');
+		console.log('Parsed Address Data:', JSON.stringify(testAddressData, null, 2));
+		console.log('=== END TEST ADDRESS PARSING ===');
+
+		return c.json({ 
+			success: true,
+			message: 'Address parsing test completed',
+			submissionId: submissionId,
+			parsedAddress: testAddressData
+		});
+		
+	} catch (error) {
+		console.error('Test address error:', error);
+		return c.json({ 
+			error: 'Failed to process test address',
+			message: error instanceof Error ? error.message : 'Unknown error'
+		}, 500);
+	}
+});
 
 // JotForm webhook endpoint - receives POST requests from JotForm
 app.post('/webhook', async (c) => {

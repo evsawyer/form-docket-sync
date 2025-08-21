@@ -1,0 +1,61 @@
+{
+    "responseCode": 200,
+    "message": "success",
+    "content": {
+        "id": "6316031154233195779",
+        "form_id": "252325082291048",
+        "ip": "2600:1700:420:354f:ed70:de89:553b:e2b4",
+        "created_at": "2025-08-21 12:31:55",
+        "status": "ACTIVE",
+        "new": "0",
+        "flag": "0",
+        "notes": "",
+        "updated_at": null,
+        "answers": {
+            "1": {
+                "name": "heading",
+                "order": "1",
+                "text": "Form",
+                "type": "control_head"
+            },
+            "2": {
+                "name": "submit2",
+                "order": "5",
+                "text": "Submit",
+                "type": "control_button"
+            },
+            "3": {
+                "cfname": "Autocompleted Address",
+                "name": "typeA",
+                "order": "2",
+                "selectedField": "537f577e93a6564a47000013",
+                "static": "No",
+                "text": "Autocompleted Address",
+                "type": "control_widget",
+                "answer": "Street name: Audiffred Lane\nHouse number: 116\nCity: Woodside\nState: CA\nPostal code: 94062\nCountry: United States"
+            },
+            "4": {
+                "cfname": "Address Map Locator",
+                "name": "typeA4",
+                "order": "3",
+                "selectedField": "5290f66c23b1347d6e000005",
+                "static": "No",
+                "text": "Address Map Locator",
+                "type": "control_widget",
+                "answer": "Longitude: -117.13272165032201\nLatitude: 32.769906631571175"
+            },
+            "5": {
+                "cfname": "GeoComplete",
+                "name": "typeA5",
+                "order": "4",
+                "selectedField": "52933bf13be147110a000005",
+                "static": "No",
+                "text": "",
+                "type": "control_widget"
+            }
+        }
+    },
+    "duration": "136.26ms",
+    "info": null,
+    "limit-left": 49999
+}
