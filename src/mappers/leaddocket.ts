@@ -1,4 +1,4 @@
-import { getStateAbbreviation } from '../processors/state';
+import { getStateAbbreviation, getStateName } from '../processors/state';
 import { createHash } from '../processors/hash';
 
 // Helper function to map our extracted data to LeadDocket format
@@ -46,11 +46,11 @@ export async function mapToLeadDocketFormat(inputParams: any): Promise<any> {
 			: inputParams.address_line_1,
 		address_line_2: inputParams.address_line_2,
 		city: inputParams.city,
-		state: inputParams.state && getStateAbbreviation(inputParams.state) 
-			? `${getStateAbbreviation(inputParams.state)} - ${inputParams.state}` 
-			: inputParams.state, // Format: "IL - Illinois"
-		state_abbr: getStateAbbreviation(inputParams.state), // Auto-convert state name to abbreviation
-		state_name: inputParams.state, // Note: LeadDocket uses "state_name" not "state"
+		state: inputParams.state && getStateName(inputParams.state) 
+			? `${inputParams.state} - ${getStateName(inputParams.state)}` 
+			: inputParams.state, // Format: "DC - District of Columbia"
+		state_abbr: inputParams.state, // Autocomplete widget provides abbreviation directly
+		state_name: getStateName(inputParams.state), // Convert abbreviation to full name
 		zip_code: inputParams.zip_code,
 		
 		// Contact information (modified with project_id)
