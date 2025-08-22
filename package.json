@@ -16,6 +16,8 @@
 		"wrangler": "^4.31.0"
 	},
 	"dependencies": {
-		"hono": "^4.8.10"
+		"fit-curve": "^0.2.0",
+		"hono": "^4.8.10",
+		"upng-js": "^2.1.0"
 	}
 }

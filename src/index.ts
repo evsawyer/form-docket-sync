@@ -22,6 +22,8 @@ import { getSubmissionDetails } from './services/jotform';
 import { processWebhookInBackground } from './services/webhook';
 import { parseAutocompletedAddress } from './extractors/address';
 import { getStateAbbreviation, getStateName } from './processors/state';
+import { convertPngToSvg, convertSignatureUrlToSvg } from './processors/svg-signature';
+import { getSignatureFromSubmission } from './extractors/signature';
 
 // Create Hono app with proper typing
 const app = new Hono<{ Bindings: Bindings }>();
@@ -33,7 +35,7 @@ app.use('/*', cors());
 
 // Home route
 app.get('/', (c) => {
-	return c.text('JotForm to LeadDocket Sync Worker - Available endpoints: POST /webhook, GET /submission/:submissionId');
+	return c.text('JotForm to LeadDocket Sync Worker - Available endpoints: POST /webhook, POST /test-address, POST /test-svg-signature, POST /test-png-url, GET /preview-svg');
 });
 
 // GET endpoint to fetch and log complete JotForm submission data
@@ -150,6 +152,184 @@ app.post('/test-address', async (c) => {
 		console.error('Test address error:', error);
 		return c.json({ 
 			error: 'Failed to process test address',
+			message: error instanceof Error ? error.message : 'Unknown error'
+		}, 500);
+	}
+});
+
+// Test endpoint for Zhang-Suen SVG signature conversion from JotForm submission
+app.post('/test-svg-signature', async (c) => {
+	try {
+		console.log('=== Test SVG Signature Endpoint Received ===');
+		
+		// Handle both form-data and JSON content types
+		let submissionId: string | undefined;
+		let threshold = 150;
+		let strokeWidth = 1;
+		let fitError = 2.0;
+		
+		const contentType = c.req.header('content-type') || '';
+		
+		if (contentType.includes('application/json')) {
+			const jsonData = await c.req.json();
+			submissionId = jsonData.submissionId;
+			threshold = jsonData.threshold || 150;
+			strokeWidth = jsonData.strokeWidth || 1;
+			fitError = jsonData.fitError || 2.0;
+		} else {
+			// Assume form-data (from webhook format)
+			const formData = await c.req.formData();
+			submissionId = formData.get('submissionID')?.toString();
+		}
+		
+		console.log(`Test SVG: SubmissionID=${submissionId}, threshold=${threshold}, strokeWidth=${strokeWidth}, fitError=${fitError}`);
+		
+		if (!submissionId) {
+			console.error('No submissionID found in test payload');
+			return c.json({ 
+				error: 'Missing submissionID in test payload' 
+			}, 400);
+		}
+
+		// Fetch submission data to get signature
+		console.log(`Fetching submission details for SVG test: ${submissionId}`);
+		const submissionData = await getSubmissionDetails(submissionId, c.env.JOTFORM_API_KEY);
+		
+		if (!submissionData) {
+			console.error('Failed to fetch submission details from JotForm API');
+			return c.json({ 
+				error: 'Failed to fetch submission details from JotForm API' 
+			}, 500);
+		}
+
+		// Extract signature and convert to SVG using Zhang-Suen
+		const signatureBase64 = await getSignatureFromSubmission(submissionData, c.env.JOTFORM_API_KEY);
+		
+		if (!signatureBase64) {
+			console.log('No signature found in submission');
+			return c.json({ 
+				success: true,
+				message: 'No signature found in submission',
+				submissionId: submissionId,
+				svg: null
+			});
+		}
+
+		console.log('Converting signature to SVG using Zhang-Suen + cubic Bézier...');
+		const svg = await convertPngToSvg(signatureBase64, threshold, strokeWidth, fitError);
+		
+		console.log('=== TEST SVG SIGNATURE CONVERSION RESULTS ===');
+		console.log(`SVG length: ${svg?.length || 0}`);
+		console.log('=== END TEST SVG SIGNATURE CONVERSION ===');
+
+		return c.json({ 
+			success: true,
+			message: 'SVG signature conversion test completed',
+			submissionId: submissionId,
+			threshold: threshold,
+			strokeWidth: strokeWidth,
+			fitError: fitError,
+			svg: svg
+		});
+		
+	} catch (error) {
+		console.error('Test SVG signature error:', error);
+		return c.json({ 
+			error: 'Failed to process test SVG signature',
+			message: error instanceof Error ? error.message : 'Unknown error'
+		}, 500);
+	}
+});
+
+// Test endpoint for direct PNG URL to SVG conversion using Zhang-Suen
+app.post('/test-png-url', async (c) => {
+	try {
+		console.log('=== Test PNG URL to SVG Endpoint Received ===');
+		
+		const { pngUrl, threshold = 150, strokeWidth = 1, fitError = 2.0 } = await c.req.json();
+		console.log(`Testing PNG URL: ${pngUrl}`);
+		
+		if (!pngUrl) {
+			return c.json({ 
+				error: 'Missing pngUrl in request body' 
+			}, 400);
+		}
+
+		console.log('Converting PNG URL to SVG using Zhang-Suen + cubic Bézier...');
+		const svg = await convertSignatureUrlToSvg(pngUrl, c.env.JOTFORM_API_KEY, threshold, strokeWidth, fitError);
+		
+		console.log('=== TEST PNG URL CONVERSION RESULTS ===');
+		console.log(`SVG length: ${svg?.length || 0}`);
+		console.log('=== END TEST PNG URL CONVERSION ===');
+
+		return c.json({ 
+			success: true,
+			message: 'PNG URL to SVG conversion test completed',
+			pngUrl: pngUrl,
+			threshold: threshold,
+			strokeWidth: strokeWidth,
+			fitError: fitError,
+			svg: svg
+		});
+		
+	} catch (error) {
+		console.error('Test PNG URL error:', error);
+		return c.json({ 
+			error: 'Failed to process test PNG URL',
+			message: error instanceof Error ? error.message : 'Unknown error'
+		}, 500);
+	}
+});
+
+// Preview SVG endpoint - displays SVG directly in browser
+app.get('/preview-svg', async (c) => {
+	try {
+		const svgData = c.req.query('svg');
+		
+		if (!svgData) {
+			return c.html(`
+				<html>
+					<body>
+						<h1>SVG Preview</h1>
+						<p>No SVG data provided. Use ?svg=ENCODED_SVG_DATA</p>
+						<p>Example: <code>/preview-svg?svg=${encodeURIComponent('<svg>...</svg>')}</code></p>
+					</body>
+				</html>
+			`);
+		}
+
+		const decodedSvg = decodeURIComponent(svgData);
+		
+		return c.html(`
+			<html>
+				<head>
+					<title>SVG Preview</title>
+					<style>
+						body { font-family: Arial, sans-serif; margin: 20px; }
+						.svg-container { border: 1px solid #ccc; padding: 20px; margin: 20px 0; background: #f9f9f9; }
+						.svg-code { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; white-space: pre-wrap; }
+					</style>
+				</head>
+				<body>
+					<h1>SVG Preview</h1>
+					<div class="svg-container">
+						<h3>Rendered SVG:</h3>
+						${decodedSvg}
+					</div>
+					<div class="svg-code">
+						<h3>SVG Code:</h3>
+						${decodedSvg.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+					</div>
+				</body>
+			</html>
+		`, 200, {
+			'Content-Type': 'text/html'
+		});
+		
+	} catch (error) {
+		console.error('Preview SVG error:', error);
+		return c.json({ 
+			error: 'Failed to preview SVG',
 			message: error instanceof Error ? error.message : 'Unknown error'
 		}, 500);
 	}
