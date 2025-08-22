@@ -20,7 +20,7 @@ import { Bindings } from './types/environment';
 // Import services
 import { getSubmissionDetails } from './services/jotform';
 import { processWebhookInBackground } from './services/webhook';
-import { parseAutocompletedAddress } from './extractors/address';
+import { getAddressFromSubmission } from './extractors/address';
 import { getStateAbbreviation, getStateName } from './processors/state';
 import { convertPngToSvg, convertSignatureUrlToSvg } from './processors/svg-signature';
 import { getSignatureFromSubmission } from './extractors/signature';
@@ -116,8 +116,8 @@ app.post('/test-address', async (c) => {
 			}, 500);
 		}
 
-		// Test autocompleted address parsing
-		const testAddressData = parseAutocompletedAddress(submissionData);
+		// Test address parsing (now uses autocompleted address by default)
+		const testAddressData = getAddressFromSubmission(submissionData)[0] || null;
 		
 		// Add formatted state fields if address was found
 		let formattedStateData = null;

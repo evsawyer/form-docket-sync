@@ -2,7 +2,29 @@ import { JotFormSubmissionResponse } from '../types/jotform';
 import { AddressData } from '../types/common';
 
 // Helper function to extract address from already-fetched submission data
+// Now uses Autocompleted Address widget instead of traditional address fields
 export function getAddressFromSubmission(submissionData: JotFormSubmissionResponse | null): AddressData[] {
+	const addresses: AddressData[] = [];
+	
+	if (!submissionData) {
+		console.log('No submission data provided for address');
+		return addresses;
+	}
+
+	// Use the autocompleted address parsing
+	const autocompletedAddress = parseAutocompletedAddress(submissionData);
+	if (autocompletedAddress) {
+		addresses.push(autocompletedAddress);
+		console.log('Found autocompleted address:', autocompletedAddress);
+	} else {
+		console.log('No autocompleted address found in submission');
+	}
+	
+	return addresses;
+}
+
+// Legacy function for traditional address fields (kept for reference)
+export function getLegacyAddressFromSubmission(submissionData: JotFormSubmissionResponse | null): AddressData[] {
 	const addresses: AddressData[] = [];
 	
 	if (!submissionData) {
@@ -22,7 +44,7 @@ export function getAddressFromSubmission(submissionData: JotFormSubmissionRespon
 					zip_code: answer.answer.postal || null
 				};
 				addresses.push(addressData);
-				console.log(`Found address in question ${questionId}:`, addressData);
+				console.log(`Found legacy address in question ${questionId}:`, addressData);
 			}
 		}
 	}
