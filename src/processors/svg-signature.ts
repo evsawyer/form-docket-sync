@@ -1,6 +1,7 @@
 // SVG signature conversion using Zhang-Suen thinning algorithm + cubic Bézier smoothing
 import * as UPNG from 'upng-js';
 import fitCurve from 'fit-curve';
+import { trace, posterize } from 'ts-potrace';
 
 // Helper function to decode base64 to Uint8Array
 function decodeBase64ToUint8(base64: string): Uint8Array {
@@ -453,6 +454,140 @@ export async function convertSignatureUrlToSvg(signatureUrl: string, apiKey: str
 
 	} catch (error) {
 		console.error('Error converting signature URL to SVG:', error);
+		return null;
+	}
+}
+
+// Convert base64 PNG signature to SVG using ts-potrace
+export async function convertPngToSvgPotrace(base64Png: string | null, options?: {
+	background?: string;
+	color?: string;
+	threshold?: number;
+}): Promise<string | null> {
+	if (!base64Png) {
+		console.log('No base64 PNG data provided for ts-potrace conversion');
+		return null;
+	}
+
+	try {
+		console.log('=== TS-POTRACE SVG CONVERSION ===');
+		console.log(`Input: ${base64Png.length} character base64 string`);
+		console.log(`Options:`, options);
+		
+		// Convert base64 to buffer for ts-potrace
+		const bytes = decodeBase64ToUint8(base64Png);
+		
+		// Create a Promise-wrapped version of the trace function
+		const svg = await new Promise<string>((resolve, reject) => {
+			// ts-potrace expects a buffer, but we'll pass the Uint8Array directly
+			trace(bytes as any, {
+				background: options?.background || 'transparent',
+				color: options?.color || 'black',
+				threshold: options?.threshold || 120,
+				...options
+			}, (err, svg) => {
+				if (err) {
+					console.error('ts-potrace error:', err);
+					reject(err);
+				} else {
+					resolve(svg || '');
+				}
+			});
+		});
+		
+		console.log(`Generated ts-potrace SVG: ${svg.length} characters`);
+		console.log('=== TS-POTRACE CONVERSION COMPLETE ===');
+		
+		return svg;
+
+	} catch (error) {
+		console.error('Error in ts-potrace SVG conversion:', error);
+		return null;
+	}
+}
+
+// Convert base64 PNG signature to SVG using ts-potrace posterization
+export async function convertPngToSvgPosterized(base64Png: string | null, options?: {
+	steps?: number | number[];
+	fillStrategy?: 'dominant' | 'mean' | 'median';
+	background?: string;
+}): Promise<string | null> {
+	if (!base64Png) {
+		console.log('No base64 PNG data provided for ts-potrace posterization');
+		return null;
+	}
+
+	try {
+		console.log('=== TS-POTRACE POSTERIZATION ===');
+		console.log(`Input: ${base64Png.length} character base64 string`);
+		console.log(`Options:`, options);
+		
+		// Convert base64 to buffer for ts-potrace
+		const bytes = decodeBase64ToUint8(base64Png);
+		
+		// Create a Promise-wrapped version of the posterize function
+		const svg = await new Promise<string>((resolve, reject) => {
+			posterize(bytes as any, {
+				steps: options?.steps || 3,
+				fillStrategy: options?.fillStrategy || 'dominant',
+				background: options?.background || 'transparent',
+				...options
+			}, (err, svg) => {
+				if (err) {
+					console.error('ts-potrace posterization error:', err);
+					reject(err);
+				} else {
+					resolve(svg || '');
+				}
+			});
+		});
+		
+		console.log(`Generated posterized SVG: ${svg.length} characters`);
+		console.log('=== TS-POTRACE POSTERIZATION COMPLETE ===');
+		
+		return svg;
+
+	} catch (error) {
+		console.error('Error in ts-potrace posterization:', error);
+		return null;
+	}
+}
+
+// Convert PNG URL to SVG using ts-potrace
+export async function convertSignatureUrlToSvgPotrace(signatureUrl: string, apiKey: string, options?: {
+	background?: string;
+	color?: string;
+	threshold?: number;
+}): Promise<string | null> {
+	try {
+		console.log('=== TS-POTRACE URL CONVERSION ===');
+		console.log(`Fetching signature from URL: ${signatureUrl}`);
+		
+		// Fetch the PNG image
+		const response = await fetch(signatureUrl, {
+			headers: {
+				'APIKEY': apiKey
+			}
+		});
+
+		if (!response.ok) {
+			console.error(`Failed to fetch signature: ${response.status} ${response.statusText}`);
+			return null;
+		}
+
+		// Convert to base64
+		const arrayBuffer = await response.arrayBuffer();
+		const uint8Array = new Uint8Array(arrayBuffer);
+		const binaryString = Array.from(uint8Array, byte => String.fromCharCode(byte)).join('');
+		const dataUri = `data:image/png;base64,${btoa(binaryString)}`;
+		
+		console.log('Converted to base64, processing with ts-potrace...');
+		
+		// Process with ts-potrace
+		return await convertPngToSvgPotrace(dataUri, options);
+
+	} catch (error) {
+		console.error('Error converting signature URL to SVG with ts-potrace:', error);
 		return null;
 	}
 }

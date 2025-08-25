@@ -22,7 +22,7 @@ import { getSubmissionDetails } from './services/jotform';
 import { processWebhookInBackground } from './services/webhook';
 import { getAddressFromSubmission } from './extractors/address';
 import { getStateAbbreviation, getStateName } from './processors/state';
-import { convertPngToSvg, convertSignatureUrlToSvg } from './processors/svg-signature';
+import { convertPngToSvg, convertSignatureUrlToSvg, convertPngToSvgPotrace, convertPngToSvgPosterized, convertSignatureUrlToSvgPotrace } from './processors/svg-signature';
 import { getSignatureFromSubmission } from './extractors/signature';
 
 // Create Hono app with proper typing
@@ -35,7 +35,7 @@ app.use('/*', cors());
 
 // Home route
 app.get('/', (c) => {
-	return c.text('JotForm to LeadDocket Sync Worker - Available endpoints: POST /webhook, POST /test-address, POST /test-svg-signature, POST /test-png-url, GET /preview-svg');
+	return c.text('JotForm to LeadDocket Sync Worker - Available endpoints: POST /webhook, POST /test-address, POST /test-svg-signature, POST /test-png-url, POST /test-potrace-comparison, GET /preview-svg');
 });
 
 // GET endpoint to fetch and log complete JotForm submission data
@@ -330,6 +330,136 @@ app.get('/preview-svg', async (c) => {
 		console.error('Preview SVG error:', error);
 		return c.json({ 
 			error: 'Failed to preview SVG',
+			message: error instanceof Error ? error.message : 'Unknown error'
+		}, 500);
+	}
+});
+
+// Test endpoint for comparing Zhang-Suen vs ts-potrace SVG conversion
+app.post('/test-potrace-comparison', async (c) => {
+	try {
+		console.log('=== Test Potrace Comparison Endpoint Received ===');
+		
+		// Handle both form-data and JSON content types
+		let submissionId: string | undefined;
+		let zhangSuenOptions = { threshold: 150, strokeWidth: 1, fitError: 2.0 };
+		let potraceOptions = { background: 'transparent', color: 'black', threshold: 120 };
+		let usePosterization = false;
+		let posterizeOptions = { steps: 3, fillStrategy: 'dominant' as const, background: 'transparent' };
+		
+		const contentType = c.req.header('content-type') || '';
+		
+		if (contentType.includes('application/json')) {
+			const jsonData = await c.req.json();
+			submissionId = jsonData.submissionId;
+			zhangSuenOptions = { ...zhangSuenOptions, ...jsonData.zhangSuenOptions };
+			potraceOptions = { ...potraceOptions, ...jsonData.potraceOptions };
+			usePosterization = jsonData.usePosterization || false;
+			posterizeOptions = { ...posterizeOptions, ...jsonData.posterizeOptions };
+		} else {
+			// Assume form-data (from webhook format)
+			const formData = await c.req.formData();
+			submissionId = formData.get('submissionID')?.toString();
+		}
+		
+		console.log(`Test Comparison: SubmissionID=${submissionId}`);
+		console.log(`Zhang-Suen options:`, zhangSuenOptions);
+		console.log(`Potrace options:`, potraceOptions);
+		console.log(`Use posterization:`, usePosterization);
+		if (usePosterization) {
+			console.log(`Posterize options:`, posterizeOptions);
+		}
+		
+		if (!submissionId) {
+			console.error('No submissionID found in test payload');
+			return c.json({ 
+				error: 'Missing submissionID in test payload' 
+			}, 400);
+		}
+
+		// Fetch submission data to get signature
+		console.log(`Fetching submission details for comparison test: ${submissionId}`);
+		const submissionData = await getSubmissionDetails(submissionId, c.env.JOTFORM_API_KEY);
+		
+		if (!submissionData) {
+			console.error('Failed to fetch submission details from JotForm API');
+			return c.json({ 
+				error: 'Failed to fetch submission details from JotForm API' 
+			}, 500);
+		}
+
+		// Extract signature base64
+		const signatureBase64 = await getSignatureFromSubmission(submissionData, c.env.JOTFORM_API_KEY);
+		
+		if (!signatureBase64) {
+			console.log('No signature found in submission');
+			return c.json({ 
+				success: true,
+				message: 'No signature found in submission',
+				submissionId: submissionId,
+				results: null
+			});
+		}
+
+		console.log('Converting signature using both methods...');
+		
+		// Convert using Zhang-Suen algorithm
+		const zhangSuenStart = Date.now();
+		const zhangSuenSvg = await convertPngToSvg(
+			signatureBase64, 
+			zhangSuenOptions.threshold, 
+			zhangSuenOptions.strokeWidth, 
+			zhangSuenOptions.fitError
+		);
+		const zhangSuenTime = Date.now() - zhangSuenStart;
+		
+		// Convert using ts-potrace
+		const potraceStart = Date.now();
+		let potraceSvg: string | null;
+		
+		if (usePosterization) {
+			potraceSvg = await convertPngToSvgPosterized(signatureBase64, posterizeOptions);
+		} else {
+			potraceSvg = await convertPngToSvgPotrace(signatureBase64, potraceOptions);
+		}
+		const potraceTime = Date.now() - potraceStart;
+		
+		// Generate preview URLs
+		const zhangSuenPreview = zhangSuenSvg ? `http://localhost:58230/preview-svg?svg=${encodeURIComponent(zhangSuenSvg)}` : null;
+		const potracePreview = potraceSvg ? `http://localhost:58230/preview-svg?svg=${encodeURIComponent(potraceSvg)}` : null;
+		
+		console.log('=== COMPARISON RESULTS ===');
+		console.log(`Zhang-Suen: ${zhangSuenTime}ms, ${zhangSuenSvg?.length || 0} chars`);
+		console.log(`ts-potrace: ${potraceTime}ms, ${potraceSvg?.length || 0} chars`);
+		console.log('=== END COMPARISON ===');
+
+		return c.json({ 
+			success: true,
+			message: 'SVG conversion comparison completed',
+			submissionId: submissionId,
+			results: {
+				zhangSuen: {
+					svg: zhangSuenSvg,
+					processingTime: zhangSuenTime,
+					options: zhangSuenOptions,
+					previewUrl: zhangSuenPreview,
+					size: zhangSuenSvg?.length || 0
+				},
+				potrace: {
+					svg: potraceSvg,
+					processingTime: potraceTime,
+					options: usePosterization ? posterizeOptions : potraceOptions,
+					method: usePosterization ? 'posterization' : 'trace',
+					previewUrl: potracePreview,
+					size: potraceSvg?.length || 0
+				}
+			}
+		});
+		
+	} catch (error) {
+		console.error('Test potrace comparison error:', error);
+		return c.json({ 
+			error: 'Failed to process potrace comparison test',
 			message: error instanceof Error ? error.message : 'Unknown error'
 		}, 500);
 	}
