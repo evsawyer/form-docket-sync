@@ -2,12 +2,26 @@
 import * as UPNG from 'upng-js';
 import fitCurve from 'fit-curve';
 import { trace, posterize } from 'ts-potrace';
+import { Buffer } from 'buffer';
 
 // Helper function to decode base64 to Uint8Array
 function decodeBase64ToUint8(base64: string): Uint8Array {
-	const comma = base64.indexOf(',');
-	const b64 = base64.startsWith('data:') && comma >= 0 ? base64.slice(comma + 1) : base64;
-	const bin = atob(b64);
+	// Handle case where base64 might be missing the "data:" prefix
+	let processedBase64 = base64;
+	if (!base64.startsWith('data:') && base64.includes(';base64,')) {
+		processedBase64 = `data:${base64}`;
+	}
+	
+	const comma = processedBase64.indexOf(',');
+	const b64 = processedBase64.startsWith('data:') && comma >= 0 ? processedBase64.slice(comma + 1) : processedBase64;
+	
+	// Clean up the base64 string - remove any invalid characters
+	const cleanedB64 = b64.replace(/[^A-Za-z0-9+/=]/g, '');
+	
+	// Add padding if needed
+	const paddedB64 = cleanedB64 + '='.repeat((4 - cleanedB64.length % 4) % 4);
+	
+	const bin = atob(paddedB64);
 	const out = new Uint8Array(bin.length);
 	for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
 	return out;
@@ -413,7 +427,7 @@ export async function convertPngToSvg(base64Png: string | null, threshold = 150,
 		
 		// Generate preview URL for easy viewing
 		const encodedSvg = encodeURIComponent(svg);
-		const previewUrl = `http://localhost:58230/preview-svg?svg=${encodedSvg}`;
+		const previewUrl = `http://localhost:8787/preview-svg?svg=${encodedSvg}`;
 		console.log(`🎨 Preview URL: ${previewUrl}`);
 		console.log('=== CONVERSION COMPLETE ===');
 		
@@ -463,6 +477,9 @@ export async function convertPngToSvgPotrace(base64Png: string | null, options?:
 	background?: string;
 	color?: string;
 	threshold?: number;
+	turdSize?: number;
+	optTolerance?: number;
+	alphaMax?: number;
 }): Promise<string | null> {
 	if (!base64Png) {
 		console.log('No base64 PNG data provided for ts-potrace conversion');
@@ -479,20 +496,45 @@ export async function convertPngToSvgPotrace(base64Png: string | null, options?:
 		
 		// Create a Promise-wrapped version of the trace function
 		const svg = await new Promise<string>((resolve, reject) => {
-			// ts-potrace expects a buffer, but we'll pass the Uint8Array directly
-			trace(bytes as any, {
-				background: options?.background || 'transparent',
+			// Try different approaches for better signature tracing
+			const traceOptions = {
+				background: options?.background || 'white',
 				color: options?.color || 'black',
-				threshold: options?.threshold || 120,
+				threshold: options?.threshold || 128,
+				turdSize: options?.turdSize || 2,
+				optTolerance: options?.optTolerance || 0.2,
+				alphaMax: options?.alphaMax || 1.0,
+				optCurve: true,
+				blackOnWhite: false, // Try inverted tracing
+				turnPolicy: 'left', // Try different turn policy
 				...options
-			}, (err, svg) => {
-				if (err) {
-					console.error('ts-potrace error:', err);
-					reject(err);
-				} else {
-					resolve(svg || '');
-				}
-			});
+			};
+			
+			console.log('ts-potrace trace options:', traceOptions);
+			
+			// Try with proper Buffer polyfill
+			try {
+				console.log('Trying ts-potrace with Buffer polyfill...');
+				
+				// Create a proper Buffer from the Uint8Array
+				const properBuffer = Buffer.from(bytes);
+				console.log(`Created Buffer: length=${properBuffer.length}, type=${typeof properBuffer}`);
+				
+				trace(properBuffer, traceOptions, (err, svg) => {
+					if (err) {
+						console.error('ts-potrace Buffer polyfill error:', err);
+						// Fallback: maybe ts-potrace just doesn't work well in Workers environment
+						console.log('ts-potrace may not be compatible with Cloudflare Workers');
+						reject(new Error('ts-potrace is not compatible with Cloudflare Workers environment'));
+					} else {
+						console.log('ts-potrace succeeded with Buffer polyfill!');
+						resolve(svg || '');
+					}
+				});
+			} catch (error) {
+				console.error('ts-potrace Buffer polyfill setup error:', error);
+				reject(error);
+			}
 		});
 		
 		console.log(`Generated ts-potrace SVG: ${svg.length} characters`);
@@ -511,6 +553,7 @@ export async function convertPngToSvgPosterized(base64Png: string | null, option
 	steps?: number | number[];
 	fillStrategy?: 'dominant' | 'mean' | 'median';
 	background?: string;
+	color?: string;
 }): Promise<string | null> {
 	if (!base64Png) {
 		console.log('No base64 PNG data provided for ts-potrace posterization');
@@ -527,12 +570,21 @@ export async function convertPngToSvgPosterized(base64Png: string | null, option
 		
 		// Create a Promise-wrapped version of the posterize function
 		const svg = await new Promise<string>((resolve, reject) => {
-			posterize(bytes as any, {
-				steps: options?.steps || 3,
+			// Convert Uint8Array to base64 data URL for ts-potrace
+			const base64String = btoa(String.fromCharCode(...bytes));
+			const dataUrl = `data:image/png;base64,${base64String}`;
+			
+			const posterizeOptions = {
+				steps: options?.steps || [40, 128, 200],
 				fillStrategy: options?.fillStrategy || 'dominant',
-				background: options?.background || 'transparent',
+				background: options?.background || 'white',
+				color: options?.color || 'black',
 				...options
-			}, (err, svg) => {
+			};
+			
+			console.log('ts-potrace posterize options:', posterizeOptions);
+			
+			posterize(dataUrl, posterizeOptions, (err, svg) => {
 				if (err) {
 					console.error('ts-potrace posterization error:', err);
 					reject(err);
@@ -558,6 +610,9 @@ export async function convertSignatureUrlToSvgPotrace(signatureUrl: string, apiK
 	background?: string;
 	color?: string;
 	threshold?: number;
+	turdSize?: number;
+	optTolerance?: number;
+	alphaMax?: number;
 }): Promise<string | null> {
 	try {
 		console.log('=== TS-POTRACE URL CONVERSION ===');

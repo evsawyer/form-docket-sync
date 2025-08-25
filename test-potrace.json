@@ -1,0 +1,19 @@
+{
+  "submissionId": "YOUR_SUBMISSION_ID_HERE",
+  "zhangSuenOptions": {
+    "threshold": 150,
+    "strokeWidth": 1,
+    "fitError": 2.0
+  },
+  "potraceOptions": {
+    "background": "transparent",
+    "color": "black",
+    "threshold": 120
+  },
+  "usePosterization": false,
+  "posterizeOptions": {
+    "steps": 3,
+    "fillStrategy": "dominant",
+    "background": "transparent"
+  }
+}

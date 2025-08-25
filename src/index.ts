@@ -24,6 +24,8 @@ import { getAddressFromSubmission } from './extractors/address';
 import { getStateAbbreviation, getStateName } from './processors/state';
 import { convertPngToSvg, convertSignatureUrlToSvg, convertPngToSvgPotrace, convertPngToSvgPosterized, convertSignatureUrlToSvgPotrace } from './processors/svg-signature';
 import { getSignatureFromSubmission } from './extractors/signature';
+import { trace } from 'ts-potrace';
+import { Buffer } from 'buffer';
 
 // Create Hono app with proper typing
 const app = new Hono<{ Bindings: Bindings }>();
@@ -35,7 +37,7 @@ app.use('/*', cors());
 
 // Home route
 app.get('/', (c) => {
-	return c.text('JotForm to LeadDocket Sync Worker - Available endpoints: POST /webhook, POST /test-address, POST /test-svg-signature, POST /test-png-url, POST /test-potrace-comparison, GET /preview-svg');
+	return c.text('JotForm to LeadDocket Sync Worker - Available endpoints: POST /webhook, POST /test-address, POST /test-svg-signature, POST /test-png-url, POST /test-potrace-comparison, POST /test-potrace-direct, POST /test-potrace-configs, GET /debug-buffer-image, GET /preview-svg, GET /compare-svg');
 });
 
 // GET endpoint to fetch and log complete JotForm submission data
@@ -335,6 +337,93 @@ app.get('/preview-svg', async (c) => {
 	}
 });
 
+// Compare SVG endpoint - displays two SVGs side by side
+app.get('/compare-svg', async (c) => {
+	try {
+		const zhangSuenSvg = c.req.query('zhang');
+		const potraceSvg = c.req.query('potrace');
+		
+		if (!zhangSuenSvg && !potraceSvg) {
+			return c.html(`
+				<html>
+					<body>
+						<h1>SVG Comparison</h1>
+						<p>No SVG data provided. Use ?zhang=ENCODED_SVG_DATA&potrace=ENCODED_SVG_DATA</p>
+						<p>Example: <code>/compare-svg?zhang=${encodeURIComponent('<svg>...</svg>')}&potrace=${encodeURIComponent('<svg>...</svg>')}</code></p>
+					</body>
+				</html>
+			`);
+		}
+
+		const decodedZhangSuen = zhangSuenSvg ? decodeURIComponent(zhangSuenSvg) : null;
+		const decodedPotrace = potraceSvg ? decodeURIComponent(potraceSvg) : null;
+		
+		return c.html(`
+			<html>
+				<head>
+					<title>SVG Algorithm Comparison</title>
+					<style>
+						body { font-family: Arial, sans-serif; margin: 20px; }
+						.comparison-container { display: flex; gap: 20px; }
+						.svg-panel { flex: 1; border: 1px solid #ccc; padding: 20px; background: #f9f9f9; }
+						.svg-container { border: 1px solid #ddd; padding: 20px; margin: 10px 0; background: white; min-height: 200px; display: flex; align-items: center; justify-content: center; }
+						.algorithm-title { color: #333; margin-bottom: 10px; }
+						.stats { background: #e9e9e9; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; }
+						.no-data { color: #666; font-style: italic; text-align: center; padding: 40px; }
+					</style>
+				</head>
+				<body>
+					<h1>SVG Algorithm Comparison</h1>
+					<div class="comparison-container">
+						<div class="svg-panel">
+							<h2 class="algorithm-title">Zhang-Suen + Cubic Bézier</h2>
+							${zhangSuenSvg ? `
+								<div class="svg-container">
+									${decodedZhangSuen}
+								</div>
+								<div class="stats">
+									Size: ${decodedZhangSuen?.length || 0} characters
+								</div>
+							` : `
+								<div class="no-data">No Zhang-Suen SVG provided</div>
+							`}
+						</div>
+						<div class="svg-panel">
+							<h2 class="algorithm-title">ts-potrace</h2>
+							${potraceSvg ? `
+								<div class="svg-container">
+									${decodedPotrace}
+								</div>
+								<div class="stats">
+									Size: ${decodedPotrace?.length || 0} characters
+								</div>
+							` : `
+								<div class="no-data">No ts-potrace SVG provided</div>
+							`}
+						</div>
+					</div>
+					${zhangSuenSvg && potraceSvg ? `
+						<div style="margin-top: 20px; padding: 15px; background: #f0f8ff; border-radius: 4px;">
+							<h3>Comparison Summary</h3>
+							<p><strong>Size difference:</strong> ${((decodedZhangSuen?.length || 0) - (decodedPotrace?.length || 0))} characters</p>
+							<p><strong>Compression:</strong> ts-potrace is ${Math.round((1 - (decodedPotrace?.length || 0) / (decodedZhangSuen?.length || 1)) * 100)}% smaller</p>
+						</div>
+					` : ''}
+				</body>
+			</html>
+		`, 200, {
+			'Content-Type': 'text/html'
+		});
+		
+	} catch (error) {
+		console.error('Compare SVG error:', error);
+		return c.json({ 
+			error: 'Failed to compare SVGs',
+			message: error instanceof Error ? error.message : 'Unknown error'
+		}, 500);
+	}
+});
+
 // Test endpoint for comparing Zhang-Suen vs ts-potrace SVG conversion
 app.post('/test-potrace-comparison', async (c) => {
 	try {
@@ -343,9 +432,24 @@ app.post('/test-potrace-comparison', async (c) => {
 		// Handle both form-data and JSON content types
 		let submissionId: string | undefined;
 		let zhangSuenOptions = { threshold: 150, strokeWidth: 1, fitError: 2.0 };
-		let potraceOptions = { background: 'transparent', color: 'black', threshold: 120 };
-		let usePosterization = false;
-		let posterizeOptions = { steps: 3, fillStrategy: 'dominant' as const, background: 'transparent' };
+		let potraceOptions = { 
+			background: 'white', 
+			color: 'black', 
+			threshold: 128,
+			turdSize: 2,
+			optTolerance: 0.2,
+			alphaMax: 1.0,
+			optCurve: true,
+			blackOnWhite: false, // Invert tracing
+			turnPolicy: 'left'
+		};
+		let usePosterization = true;
+		let posterizeOptions = { 
+			steps: [40, 128, 200], 
+			fillStrategy: 'dominant' as const, 
+			background: 'white',
+			color: 'black'
+		};
 		
 		const contentType = c.req.header('content-type') || '';
 		
@@ -425,18 +529,26 @@ app.post('/test-potrace-comparison', async (c) => {
 		const potraceTime = Date.now() - potraceStart;
 		
 		// Generate preview URLs
-		const zhangSuenPreview = zhangSuenSvg ? `http://localhost:58230/preview-svg?svg=${encodeURIComponent(zhangSuenSvg)}` : null;
-		const potracePreview = potraceSvg ? `http://localhost:58230/preview-svg?svg=${encodeURIComponent(potraceSvg)}` : null;
+		const zhangSuenPreview = zhangSuenSvg ? `http://localhost:8787/preview-svg?svg=${encodeURIComponent(zhangSuenSvg)}` : null;
+		const potracePreview = potraceSvg ? `http://localhost:8787/preview-svg?svg=${encodeURIComponent(potraceSvg)}` : null;
+		
+		// Generate side-by-side comparison URL
+		const comparisonUrl = (zhangSuenSvg && potraceSvg) ? 
+			`http://localhost:8787/compare-svg?zhang=${encodeURIComponent(zhangSuenSvg)}&potrace=${encodeURIComponent(potraceSvg)}` : null;
 		
 		console.log('=== COMPARISON RESULTS ===');
 		console.log(`Zhang-Suen: ${zhangSuenTime}ms, ${zhangSuenSvg?.length || 0} chars`);
 		console.log(`ts-potrace: ${potraceTime}ms, ${potraceSvg?.length || 0} chars`);
+		if (comparisonUrl) {
+			console.log(`🎨 Side-by-side comparison: ${comparisonUrl}`);
+		}
 		console.log('=== END COMPARISON ===');
 
 		return c.json({ 
 			success: true,
 			message: 'SVG conversion comparison completed',
 			submissionId: submissionId,
+			comparisonUrl: comparisonUrl,
 			results: {
 				zhangSuen: {
 					svg: zhangSuenSvg,
@@ -460,6 +572,529 @@ app.post('/test-potrace-comparison', async (c) => {
 		console.error('Test potrace comparison error:', error);
 		return c.json({ 
 			error: 'Failed to process potrace comparison test',
+			message: error instanceof Error ? error.message : 'Unknown error'
+		}, 500);
+	}
+});
+
+// Test endpoint for ts-potrace with direct URL (bypassing signature extraction)
+app.post('/test-potrace-direct', async (c) => {
+	try {
+		console.log('=== Test Potrace Direct Endpoint Received ===');
+		
+		const { signatureUrl, apiKey, options = {} } = await c.req.json();
+		
+		if (!signatureUrl) {
+			return c.json({ 
+				error: 'Missing signatureUrl in request body' 
+			}, 400);
+		}
+		
+		console.log(`Testing ts-potrace with direct URL: ${signatureUrl}`);
+		console.log(`Options:`, options);
+		
+		// Test 1: Direct URL to ts-potrace
+		const directStart = Date.now();
+		const directSvg = await convertSignatureUrlToSvgPotrace(
+			signatureUrl, 
+			apiKey || c.env.JOTFORM_API_KEY, 
+			{
+				background: 'white',
+				color: 'black',
+				threshold: 128,
+				turdSize: 2,
+				optTolerance: 0.2,
+				alphaMax: 1.0,
+				optCurve: true,
+				...options
+			}
+		);
+		const directTime = Date.now() - directStart;
+		
+		// Test 2: Fetch raw image and pass directly to ts-potrace
+		const rawStart = Date.now();
+		let rawSvg: string | null = null;
+		
+		try {
+			console.log('Fetching raw image data...');
+			const response = await fetch(`${signatureUrl}?apiKey=${apiKey || c.env.JOTFORM_API_KEY}`);
+			if (response.ok) {
+				const arrayBuffer = await response.arrayBuffer();
+				const uint8Array = new Uint8Array(arrayBuffer);
+				const base64 = btoa(String.fromCharCode(...uint8Array));
+				const mimeType = response.headers.get('content-type') || 'image/png';
+				const properDataUri = `data:${mimeType};base64,${base64}`;
+				
+				console.log(`Raw fetch: ${properDataUri.length} chars, MIME: ${mimeType}`);
+				
+				rawSvg = await convertPngToSvgPotrace(properDataUri, {
+					background: 'transparent',
+					color: 'black',
+					threshold: 128,
+					turdSize: 2,
+					optTolerance: 0.2,
+					alphaMax: 1.0,
+					optCurve: true,
+					...options
+				});
+			}
+		} catch (error) {
+			console.error('Raw fetch error:', error);
+		}
+		
+		const rawTime = Date.now() - rawStart;
+		
+		// Generate preview URLs
+		const directPreview = directSvg ? `http://localhost:8787/preview-svg?svg=${encodeURIComponent(directSvg)}` : null;
+		const rawPreview = rawSvg ? `http://localhost:8787/preview-svg?svg=${encodeURIComponent(rawSvg)}` : null;
+		const comparisonUrl = (directSvg && rawSvg) ? 
+			`http://localhost:8787/compare-svg?zhang=${encodeURIComponent(directSvg)}&potrace=${encodeURIComponent(rawSvg)}` : null;
+		
+		console.log('=== DIRECT POTRACE TEST RESULTS ===');
+		console.log(`Direct URL method: ${directTime}ms, ${directSvg?.length || 0} chars`);
+		console.log(`Raw fetch method: ${rawTime}ms, ${rawSvg?.length || 0} chars`);
+		if (comparisonUrl) {
+			console.log(`🎨 Comparison: ${comparisonUrl}`);
+		}
+		console.log('=== END DIRECT TEST ===');
+
+		return c.json({ 
+			success: true,
+			message: 'Direct ts-potrace test completed',
+			signatureUrl: signatureUrl,
+			comparisonUrl: comparisonUrl,
+			results: {
+				directUrl: {
+					svg: directSvg,
+					processingTime: directTime,
+					previewUrl: directPreview,
+					size: directSvg?.length || 0
+				},
+				rawFetch: {
+					svg: rawSvg,
+					processingTime: rawTime,
+					previewUrl: rawPreview,
+					size: rawSvg?.length || 0
+				}
+			}
+		});
+		
+	} catch (error) {
+		console.error('Test potrace direct error:', error);
+		return c.json({ 
+			error: 'Failed to process direct potrace test',
+			message: error instanceof Error ? error.message : 'Unknown error'
+		}, 500);
+	}
+});
+
+// Debug endpoint to visualize the Buffer as an image
+app.get('/debug-buffer-image', async (c) => {
+	const signatureUrl = c.req.query('signatureUrl');
+	if (!signatureUrl) {
+		return c.json({ error: 'Missing signatureUrl parameter' }, 400);
+	}
+
+	try {
+		// Fetch the image
+		const response = await fetch(`${signatureUrl}?apiKey=${c.env.JOTFORM_API_KEY}`);
+		if (!response.ok) {
+			return c.json({ error: 'Failed to fetch image' }, 500);
+		}
+
+		const arrayBuffer = await response.arrayBuffer();
+		const uint8Array = new Uint8Array(arrayBuffer);
+		
+		// Return the raw image data so we can see what potrace is getting
+		return new Response(uint8Array, {
+			headers: {
+				'Content-Type': 'image/png',
+				'Content-Length': uint8Array.length.toString()
+			}
+		});
+	} catch (error) {
+		console.error('Error in debug-buffer-image:', error);
+		return c.json({ error: 'Failed to process image' }, 500);
+	}
+});
+
+// Test endpoint for trying multiple potrace configurations
+app.post('/test-potrace-configs', async (c) => {
+	try {
+		console.log('=== Test Multiple Potrace Configs ===');
+		
+		const { signatureUrl, apiKey } = await c.req.json();
+		
+		if (!signatureUrl) {
+			return c.json({ 
+				error: 'Missing signatureUrl in request body' 
+			}, 400);
+		}
+		
+		// Define different configurations to test - focused on transparent backgrounds
+		const configs = [
+			{
+				name: 'Completely default (transparent bg)',
+				options: {} // Pure ts-potrace defaults - should have transparent background
+			},
+			{
+				name: 'Stroke only (no fill)',
+				options: {
+				  threshold: 150,
+				  optCurve: false,
+				  turdSize: 0,
+				  color: 'none',
+				  stroke: 'black'
+				}
+			  },
+			  {
+				name: 'Inverted colors',
+				options: {
+				  threshold: 150,
+				  optCurve: false,
+				  turdSize: 0,
+				  blackOnWhite: false
+				}
+			  },
+			  {
+				name: 'Extreme threshold',
+				options: {
+				  threshold: 250,
+				  optCurve: false,
+				  turdSize: 0
+				}
+			  },
+			  {
+				name: 'Looser curve optimization',
+				options: {
+				  threshold: 150,
+				  optCurve: true,
+				  optTolerance: 0.5,
+				  turdSize: 0
+				}
+			  },
+			  {
+				name: 'High threshold + stroke only',
+				options: {
+				  threshold: 200,
+				  optCurve: false,
+				  turdSize: 0,
+				  color: 'none',
+				  stroke: 'black'
+				}
+			  },
+			  {
+				threshold: 200,
+				optCurve: false,
+				turdSize: 10,
+				color: 'none',
+				stroke: 'black'
+			  },
+			  {
+				threshold: 180, 
+				optCurve: true,
+				optTolerance: 0.8,
+				turdSize: 10,
+				color: 'none',
+				stroke: 'black'  
+			  },
+			  {
+				threshold: 150,
+				blackOnWhite: false, 
+				optCurve: false,
+				turdSize: 15,
+				color: 'none',
+				stroke: 'black'
+			  },
+			  {
+				threshold: 165,
+				blackOnWhite: false,
+				optCurve: true, 
+				optTolerance: 0.6,
+				turdSize: 12,
+				color: 'none',
+				stroke: 'black'
+			  },
+			  {
+				threshold: 220,
+				optCurve: false,
+				turdSize: 20, 
+				color: 'none',
+				stroke: 'black'
+			  },
+			  
+
+			{
+				name: 'No curve optimization (current best)',
+				options: { 
+					threshold: 150,
+					optCurve: false, // Disable all curve smoothing
+					turdSize: 0
+					// No background specified - should be transparent
+				}
+			},
+			{
+				name: 'No curve + explicit transparent',
+				options: { 
+					threshold: 150,
+					optCurve: false,
+					turdSize: 0,
+					background: 'transparent' // Explicitly set transparent
+				}
+			},
+			{
+				name: 'Higher threshold + transparent',
+				options: { 
+					threshold: 150, // Much higher threshold
+					optCurve: false,
+					turdSize: 0
+					// No background - should be transparent
+				}
+			},
+			{
+				name: 'Very high threshold + transparent',
+				options: { 
+					threshold: 200, // Very high threshold
+					optCurve: false,
+					turdSize: 0
+					// No background - should be transparent
+				}
+			},
+			{
+				name: 'No curve + remove noise + transparent',
+				options: { 
+					threshold: 150,
+					optCurve: false,
+					turdSize: 5 // Remove small noise areas
+					// No background - should be transparent
+				}
+			},
+			{
+				name: 'Lower threshold + transparent',
+				options: { 
+					threshold: 125, // Lower threshold
+					optCurve: false,
+					turdSize: 0
+					// No background - should be transparent
+				}
+			},
+			{
+				name: 'No curve + minority turns + transparent',
+				options: { 
+					threshold: 150,
+					optCurve: false,
+					turdSize: 0,
+					turnPolicy: 'minority'
+					// No background - should be transparent
+				}
+			}
+		];
+		
+		// Fetch the image once
+		console.log('Fetching image...');
+		const response = await fetch(`${signatureUrl}?apiKey=${apiKey || c.env.JOTFORM_API_KEY}`);
+		if (!response.ok) {
+			return c.json({ error: 'Failed to fetch image' }, 500);
+		}
+		
+		const arrayBuffer = await response.arrayBuffer();
+		const uint8Array = new Uint8Array(arrayBuffer);
+		// Create Buffer directly from the image bytes - this is what ts-potrace expects!
+		const imageBuffer = Buffer.from(uint8Array);
+		
+		console.log(`Testing ${configs.length} configurations...`);
+		
+		// Test each configuration
+		const results = [];
+		for (const config of configs) {
+			try {
+				const startTime = Date.now();
+				// Only apply default settings if they're not specified in the config
+				const finalOptions = {
+					// Minimal defaults - let ts-potrace use its own defaults where possible
+					// Don't set background - let it default to transparent
+					// Don't set color - let it default to black
+					// turdSize: 2,
+					// optTolerance: 0.2,
+					// alphaMax: 1.0,
+					// optCurve: true,
+					// Config-specific options override defaults
+					...config.options
+				};
+				// Call ts-potrace directly with the Buffer instead of going through our wrapper
+				const svg = await new Promise<string>((resolve, reject) => {
+					trace(imageBuffer, finalOptions as any, function(err, svg) {
+						if (err) reject(err);
+						else resolve(svg || '');
+					});
+				});
+				const endTime = Date.now();
+				
+				results.push({
+					name: config.name,
+					options: config.options,
+					svg: svg,
+					size: svg?.length || 0,
+					time: endTime - startTime,
+					previewUrl: svg ? `http://localhost:8787/preview-svg?svg=${encodeURIComponent(svg)}` : null
+				});
+				
+				console.log(`${config.name}: ${svg?.length || 0} chars in ${endTime - startTime}ms`);
+			} catch (error) {
+				console.error(`${config.name} failed:`, error);
+				results.push({
+					name: config.name,
+					options: config.options,
+					error: error instanceof Error ? error.message : 'Unknown error'
+				});
+			}
+		}
+		
+		// Generate a comparison URL with the best looking results
+		const successfulResults = results.filter(r => r.svg && !r.error);
+		let comparisonUrl = null;
+		if (successfulResults.length >= 2) {
+			const first = successfulResults[0];
+			const second = successfulResults[1];
+			comparisonUrl = `http://localhost:8787/compare-svg?zhang=${encodeURIComponent(first.svg || '')}&potrace=${encodeURIComponent(second.svg || '')}`;
+		}
+		
+		console.log('=== END POTRACE CONFIG TEST ===');
+		
+		return c.json({
+			success: true,
+			message: 'Multiple potrace configurations tested',
+			signatureUrl: signatureUrl,
+			comparisonUrl: comparisonUrl,
+			results: results
+		});
+		
+	} catch (error) {
+		console.error('Test potrace configs error:', error);
+		return c.json({ 
+			error: 'Failed to test potrace configurations',
+			message: error instanceof Error ? error.message : 'Unknown error'
+		}, 500);
+	}
+});
+
+// Test endpoint for potrace configs with uploaded file data
+app.post('/test-potrace-configs-upload', async (c) => {
+	try {
+		console.log('=== Test Potrace Configs on Uploaded File ===');
+		
+		const { fileBase64 } = await c.req.json();
+		
+		if (!fileBase64) {
+			return c.json({ 
+				error: 'Missing fileBase64 in request body. Expected format: "data:image/png;base64,..."' 
+			}, 400);
+		}
+		
+		// Same configs as the URL version
+		const configs = [
+			{
+				name: 'Completely default (transparent bg)',
+				options: {}
+			},
+			{
+				name: 'Stroke only (no fill)',
+				options: {
+				  threshold: 150,
+				  optCurve: false,
+				  turdSize: 0,
+				  color: 'none',
+				  stroke: 'black'
+				}
+			},
+			{
+				name: 'No curve optimization (current best)',
+				options: { 
+					threshold: 150,
+					optCurve: false,
+					turdSize: 0
+				}
+			},
+			{
+				name: 'Higher threshold + transparent',
+				options: { 
+					threshold: 200,
+					optCurve: false,
+					turdSize: 0
+				}
+			},
+			{
+				name: 'Inverted colors',
+				options: {
+				  threshold: 150,
+				  optCurve: false,
+				  turdSize: 0,
+				  blackOnWhite: false
+				}
+			}
+		];
+		
+		// Convert base64 to Buffer
+		console.log('Converting base64 to Buffer...');
+		const base64Data = fileBase64.split(',')[1] || fileBase64;
+		const uint8Array = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+		const imageBuffer = Buffer.from(uint8Array);
+		
+		console.log(`Testing ${configs.length} configurations on uploaded file...`);
+		
+		// Test each configuration
+		const results = [];
+		for (const config of configs) {
+			try {
+				const startTime = Date.now();
+				const finalOptions = {
+					turdSize: 2,
+					optTolerance: 0.2,
+					alphaMax: 1.0,
+					optCurve: true,
+					...config.options
+				};
+				
+				const svg = await new Promise<string>((resolve, reject) => {
+					trace(imageBuffer, finalOptions as any, function(err, svg) {
+						if (err) reject(err);
+						else resolve(svg || '');
+					});
+				});
+				const endTime = Date.now();
+				
+				results.push({
+					name: config.name,
+					options: config.options,
+					svg: svg,
+					size: svg?.length || 0,
+					time: endTime - startTime,
+					previewUrl: svg ? `http://localhost:8787/preview-svg?svg=${encodeURIComponent(svg)}` : null
+				});
+				
+				console.log(`${config.name}: ${svg?.length || 0} chars in ${endTime - startTime}ms`);
+			} catch (error) {
+				console.error(`${config.name} failed:`, error);
+				results.push({
+					name: config.name,
+					options: config.options,
+					error: error instanceof Error ? error.message : 'Unknown error'
+				});
+			}
+		}
+		
+		console.log('=== END POTRACE CONFIG TEST (UPLOAD) ===');
+		
+		return c.json({
+			success: true,
+			message: 'Multiple potrace configurations tested on uploaded file',
+			results: results
+		});
+		
+	} catch (error) {
+		console.error('Test potrace configs upload error:', error);
+		return c.json({ 
+			error: 'Failed to test potrace configurations on uploaded file',
 			message: error instanceof Error ? error.message : 'Unknown error'
 		}, 500);
 	}
